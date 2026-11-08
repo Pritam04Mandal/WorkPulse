@@ -80,6 +80,23 @@ class AuthRepositoryImpl implements AuthRepository {
     await _db.deleteSetting(currentUserSettingKey);
   }
 
+  @override
+  Future<void> deleteAllLocalData() async {
+    for (final MapEntry(key: kind, value: provider) in _providers.entries) {
+      try {
+        await provider.signOut();
+      } on Exception {
+        // A provider or network failure must not block deleting local data.
+      }
+      await _tokens.clear(kind);
+    }
+    await _db.transaction(() async {
+      for (final TableInfo table in _db.allTables) {
+        await _db.delete(table).go();
+      }
+    });
+  }
+
   Future<UserRow?> _currentRow() async {
     final id = await _db.readSetting(currentUserSettingKey);
     if (id == null) return null;

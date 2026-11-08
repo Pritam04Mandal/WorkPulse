@@ -33,4 +33,7 @@ abstract interface class AuthRepository {
 
   /// Ends the session. The profile row and all activity stay on the device.
   Future<void> signOut();
+
+  /// Signs out of every provider, then empties the local database.
+  Future<void> deleteAllLocalData();
 }

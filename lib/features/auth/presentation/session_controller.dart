@@ -69,6 +69,21 @@ class SessionController extends Notifier<Session> {
     if (user != null) state = state.copyWith(user: user);
   }
 
+  /// Ends the session and returns to Welcome. Activity stays on the device.
+  Future<void> signOut() async {
+    await _repository.signOut();
+    await ref
+        .read(databaseProvider)
+        .deleteSetting(onboardingCompleteSettingKey);
+    state = const Session();
+  }
+
+  /// Wipes the device. Leaves [state] alone so the confirmation can show;
+  /// call [startOver] afterwards.
+  Future<void> deleteAllData() => _repository.deleteAllLocalData();
+
+  void startOver() => state = const Session();
+
   Future<void> completeOnboarding() async {
     // Reaching the app always leaves a profile behind, even after "Not now".
     if (state.user == null) await continueWithoutAccount();
