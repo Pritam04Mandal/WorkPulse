@@ -46,7 +46,16 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
   Future<void> _continueLocally() async {
     await ref.read(sessionProvider.notifier).continueWithoutAccount();
-    if (mounted) context.pushReplacement('/usage-access');
+    if (mounted) _next();
+  }
+
+  /// Onboarding moves on to Usage Access; Profile just returns.
+  void _next() {
+    if (ref.read(sessionProvider).onboardingComplete) {
+      context.pop();
+    } else {
+      context.pushReplacement('/usage-access');
+    }
   }
 
   @override
@@ -91,12 +100,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       ];
     }
     if (_user != null) {
-      return [
-        FilledButton(
-          onPressed: () => context.pushReplacement('/usage-access'),
-          child: const Text('Continue'),
-        ),
-      ];
+      return [FilledButton(onPressed: _next, child: const Text('Continue'))];
     }
     return [
       if (_failure != AuthFailureKind.notConfigured) ...[

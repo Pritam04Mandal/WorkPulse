@@ -33,7 +33,8 @@ String _route(DashboardDestination destination) => switch (destination) {
   DashboardDestination.timeline => '/timeline',
   DashboardDestination.projects => '/projects',
   DashboardDestination.insights => '/insights',
-  DashboardDestination.integrations => '/home/integrations',
+  DashboardDestination.github => '/integrations/github',
+  DashboardDestination.integrations => '/integrations',
   DashboardDestination.journal => '/home/journal',
 };
 
@@ -67,20 +68,33 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                 ),
                 if (summary.isSample) const SampleDataChip(),
-                const SizedBox(width: 14),
-                Container(
-                  width: 32,
-                  height: 32,
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    color: AppColors.border,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    initial,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                const SizedBox(width: 8),
+                Semantics(
+                  label: 'Profile',
+                  button: true,
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => context.push('/settings/profile'),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      alignment: Alignment.center,
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        alignment: Alignment.center,
+                        decoration: const BoxDecoration(
+                          color: AppColors.border,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          initial,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -91,7 +105,7 @@ class DashboardScreen extends ConsumerWidget {
             const SizedBox(height: 20),
             AppCard(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              onTap: () => context.go('/timeline'),
+              onTap: () => context.push('/activity/${summary.nowEntryId}'),
               child: Row(
                 children: [
                   Container(
@@ -322,7 +336,7 @@ class _Tile extends StatelessWidget {
 
   void _open(BuildContext context) {
     final route = _route(tile.destination);
-    if (tile.destination == DashboardDestination.integrations) {
+    if (tile.destination == DashboardDestination.github) {
       context.push(route);
     } else {
       context.go(route);
@@ -354,7 +368,7 @@ class _RecentRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => InkWell(
-    onTap: () => context.go('/timeline'),
+    onTap: () => context.push('/activity/${item.entryId}'),
     child: Container(
       constraints: const BoxConstraints(minHeight: 56),
       decoration: const BoxDecoration(

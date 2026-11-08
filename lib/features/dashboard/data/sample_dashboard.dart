@@ -10,6 +10,7 @@ const sampleDashboard = DashboardSummary(
     CategoryTime(ActivityCategory.meetings, 'Meetings', Duration(minutes: 65)),
     CategoryTime(ActivityCategory.other, 'Other apps', Duration(minutes: 40)),
   ],
+  nowEntryId: 'claude',
   nowLabel: 'Claude · workpulse-app',
   nowDuration: Duration(minutes: 18),
   tiles: [
@@ -29,7 +30,7 @@ const sampleDashboard = DashboardSummary(
       label: 'GitHub',
       value: '7',
       caption: '4 commits · 2 PRs · 1 review',
-      destination: DashboardDestination.integrations,
+      destination: DashboardDestination.github,
     ),
     StatTile(
       label: 'AI sessions',
@@ -40,6 +41,7 @@ const sampleDashboard = DashboardSummary(
   ],
   recent: [
     RecentActivity(
+      entryId: 'claude',
       time: '13:42',
       kind: RecentKind.ai,
       title: 'Claude session',
@@ -47,12 +49,14 @@ const sampleDashboard = DashboardSummary(
       duration: Duration(minutes: 18),
     ),
     RecentActivity(
+      entryId: 'pr42',
       time: '12:58',
       kind: RecentKind.github,
       title: 'Opened PR #42 · Add drift migrations',
       subtitle: 'GitHub · observed',
     ),
     RecentActivity(
+      entryId: 'vscode',
       time: '11:05',
       kind: RecentKind.coding,
       title: 'VS Code',
@@ -60,6 +64,7 @@ const sampleDashboard = DashboardSummary(
       duration: Duration(minutes: 73),
     ),
     RecentActivity(
+      entryId: 'sprint',
       time: '10:00',
       kind: RecentKind.meeting,
       title: 'Sprint planning',

@@ -60,8 +60,14 @@ class _UsageAccessScreenState extends ConsumerState<UsageAccessScreen>
     }
   }
 
-  Future<void> _finish() =>
-      ref.read(sessionProvider.notifier).completeOnboarding();
+  /// Onboarding continues to Home; from Settings this just returns.
+  Future<void> _finish() async {
+    if (ref.read(sessionProvider).onboardingComplete) {
+      if (mounted) context.pop();
+      return;
+    }
+    await ref.read(sessionProvider.notifier).completeOnboarding();
+  }
 
   @override
   Widget build(BuildContext context) {

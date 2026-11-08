@@ -12,6 +12,7 @@ enum DashboardDestination {
   timeline,
   projects,
   insights,
+  github,
   integrations,
   journal,
 }
@@ -34,6 +35,7 @@ enum RecentKind { coding, ai, meeting, github }
 
 class RecentActivity {
   const RecentActivity({
+    required this.entryId,
     required this.time,
     required this.kind,
     required this.title,
@@ -41,6 +43,8 @@ class RecentActivity {
     this.duration,
   });
 
+  /// The timeline event this row opens.
+  final String entryId;
   final String time;
   final RecentKind kind;
   final String title;
@@ -54,6 +58,7 @@ class DashboardSummary {
   const DashboardSummary({
     required this.isSample,
     required this.categories,
+    required this.nowEntryId,
     required this.nowLabel,
     required this.nowDuration,
     required this.tiles,
@@ -65,6 +70,7 @@ class DashboardSummary {
   /// True when the numbers are made up and must be labelled as such.
   final bool isSample;
   final List<CategoryTime> categories;
+  final String nowEntryId;
   final String nowLabel;
   final Duration nowDuration;
   final List<StatTile> tiles;

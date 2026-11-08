@@ -58,9 +58,11 @@ void main() {
       expect(redirect(false, '/sign-in/google'), isNull);
       expect(redirect(false, '/usage-access'), isNull);
     });
-    test('keeps finished users out of onboarding', () {
+    test('keeps finished users off Welcome but allows re-entry points', () {
       expect(redirect(true, '/welcome'), '/home');
       expect(redirect(true, '/timeline'), isNull);
+      expect(redirect(true, '/usage-access'), isNull);
+      expect(redirect(true, '/sign-in/google'), isNull);
     });
   });
 
