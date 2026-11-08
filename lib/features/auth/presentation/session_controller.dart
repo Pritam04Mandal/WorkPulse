@@ -1,12 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/config/auth_config.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/domain/enums.dart';
-import '../data/auth_repository_impl.dart';
-import '../data/google_identity_provider.dart';
-import '../data/microsoft_identity_provider.dart';
-import '../data/secure_token_store.dart';
 import '../domain/auth_contracts.dart';
 import '../domain/auth_models.dart';
 
@@ -17,17 +12,11 @@ final databaseProvider = Provider<AppDatabase>(
   (ref) => throw UnimplementedError('databaseProvider must be overridden'),
 );
 
-final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  const config = AuthConfig();
-  return AuthRepositoryImpl(
-    database: ref.watch(databaseProvider),
-    tokens: const SecureTokenStore(),
-    providers: {
-      AuthProvider.google: GoogleIdentityProvider(config),
-      AuthProvider.microsoft: MicrosoftIdentityProvider(config),
-    },
-  );
-});
+/// Overridden in `main` with the on-device repository.
+final authRepositoryProvider = Provider<AuthRepository>(
+  (ref) =>
+      throw UnimplementedError('authRepositoryProvider must be overridden'),
+);
 
 class Session {
   const Session({this.user, this.onboardingComplete = false});

@@ -51,9 +51,9 @@ class AppDatabase extends _$AppDatabase {
     return row?.value;
   }
 
-  Future<void> writeSetting(String key, String value) => into(
-    appSettings,
-  ).insertOnConflictUpdate(AppSetting(key: key, value: value));
+  Future<void> writeSetting(String key, String value) =>
+      into(appSettings)
+          .insertOnConflictUpdate(AppSetting(key: key, value: value));
 
   Future<void> deleteSetting(String key) =>
       (delete(appSettings)..where((t) => t.key.equals(key))).go();
