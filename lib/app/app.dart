@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_theme.dart';
 import '../features/companion/presentation/companion_controller.dart';
 import '../features/github/presentation/github_controller.dart';
+import '../features/security/presentation/app_lock.dart';
 import '../features/tracking/presentation/tracking_controller.dart';
 import 'router.dart';
 
@@ -33,10 +34,12 @@ class _WorkPulseAppState extends ConsumerState<WorkPulseApp> {
     super.initState();
     _lifecycle = AppLifecycleListener(
       onResume: () {
+        ref.read(appLockProvider.notifier).onResumed();
         _catchUp();
         _github.startLive();
       },
       onHide: () {
+        ref.read(appLockProvider.notifier).onHidden();
         _github.stopLive();
         _companion.pause();
       },
@@ -59,5 +62,6 @@ class _WorkPulseAppState extends ConsumerState<WorkPulseApp> {
     debugShowCheckedModeBanner: false,
     theme: AppTheme.dark,
     routerConfig: ref.watch(routerProvider),
+    builder: (context, child) => AppLockGate(child: child!),
   );
 }

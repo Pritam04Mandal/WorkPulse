@@ -6,6 +6,7 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/app_widgets.dart';
 import '../../../core/widgets/detail_widgets.dart';
 import '../../auth/presentation/session_controller.dart';
+import '../../security/presentation/app_lock.dart';
 import '../../tracking/presentation/tracking_controller.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -15,6 +16,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(sessionProvider.select((s) => s.user));
     final tracking = ref.watch(trackingControllerProvider);
+    final lock = ref.watch(appLockProvider);
     final excludedApps = ref.watch(excludedAppsProvider).value?.length ?? 0;
     final text = Theme.of(context).textTheme;
     final isLocal = user == null || user.isLocal;
@@ -98,10 +100,24 @@ class SettingsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
             const SectionTitle('Security'),
-            const _SwitchRow(
+            _SwitchRow(
               title: 'Biometric app lock',
-              hint: 'Not available yet',
-              value: false,
+              hint: lock.enabled
+                  ? 'On · asks when you open WorkPulse'
+                  : 'Ask for your fingerprint, face or screen lock',
+              value: lock.enabled,
+              onChanged: (on) async {
+                final result = await ref
+                    .read(appLockProvider.notifier)
+                    .setEnabled(on);
+                if (!context.mounted) return;
+                if (result == LockChangeResult.unavailable) {
+                  showToast(
+                    context,
+                    'Set up a screen lock on this phone first.',
+                  );
+                }
+              },
             ),
             const SizedBox(height: 24),
             const SectionTitle('Your data'),

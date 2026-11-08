@@ -8,12 +8,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/app.dart';
 import 'core/config/auth_config.dart';
 import 'core/database/app_database.dart';
+import 'core/database/setting_keys.dart';
 import 'core/domain/enums.dart';
 import 'features/auth/data/auth_repository_impl.dart';
 import 'features/auth/data/google_identity_provider.dart';
 import 'features/auth/data/microsoft_identity_provider.dart';
 import 'features/auth/data/secure_token_store.dart';
 import 'features/auth/presentation/session_controller.dart';
+import 'features/security/presentation/app_lock.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,6 +38,9 @@ Future<void> main() async {
       databaseProvider.overrideWithValue(database),
       authRepositoryProvider.overrideWithValue(repository),
       initialSessionProvider.overrideWithValue(initial),
+      initialLockEnabledProvider.overrideWithValue(
+        await database.readSetting(biometricLockSettingKey) == 'true',
+      ),
     ],
   );
 

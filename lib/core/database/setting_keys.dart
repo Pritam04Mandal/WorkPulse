@@ -5,4 +5,6 @@ const importFloorSettingKey = 'usage_import_floor_ms';
 /// When the live GitHub check last completed (epoch ms).
 const githubPollCursorSettingKey = 'github_poll_cursor_ms';
 
+const biometricLockSettingKey = 'biometric_lock';
+
 const privateSessionSettingKey = 'private_session';
