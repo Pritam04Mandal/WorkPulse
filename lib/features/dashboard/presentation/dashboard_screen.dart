@@ -341,12 +341,7 @@ class _Tile extends StatelessWidget {
           tile.value,
           style: AppText.mono(size: 24, weight: FontWeight.w600),
         ),
-        Text(
-          tile.caption,
-          style: AppText.caption,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        Text(tile.caption, style: AppText.caption),
       ],
     ),
   );
