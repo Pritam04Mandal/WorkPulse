@@ -13,8 +13,13 @@ import '../../companion/presentation/companion_controller.dart';
 
 const _script = 'companion/claude-code/workpulse_claude.py';
 
+enum CompanionApp { claudeCode, vscode }
+
+/// Pairing and status for apps that report from a paired computer.
 class ClaudeCodeScreen extends ConsumerStatefulWidget {
-  const ClaudeCodeScreen({super.key});
+  const ClaudeCodeScreen({this.app = CompanionApp.claudeCode, super.key});
+
+  final CompanionApp app;
 
   @override
   ConsumerState<ClaudeCodeScreen> createState() => _ClaudeCodeScreenState();
@@ -24,6 +29,9 @@ class _ClaudeCodeScreenState extends ConsumerState<ClaudeCodeScreen> {
   late final Timer _ticker;
   late final CompanionController _controller;
   var _pairingRequested = false;
+
+  bool get _isVsCode => widget.app == CompanionApp.vscode;
+  String get _title => _isVsCode ? 'VS Code' : 'Claude Code';
 
   @override
   void initState() {
@@ -91,23 +99,33 @@ class _ClaudeCodeScreenState extends ConsumerState<ClaudeCodeScreen> {
     final state = ref.watch(companionControllerProvider);
     if (devices != null && devices.isEmpty) _startPairing();
     if (devices == null) {
-      return const DetailPage(title: 'Claude Code', children: []);
+      return DetailPage(title: _title, children: const []);
     }
 
     return DetailPage(
-      title: 'Claude Code',
+      title: _title,
       children: [
         for (final device in devices) ...[
           _DeviceCard(device: device, onUnpair: () => _askUnpair(device)),
           const SizedBox(height: 12),
         ],
-        if (devices.isEmpty) ..._pairing(state),
-        if (devices.isNotEmpty) ...[
+        if (devices.isEmpty || state.offer != null) ..._pairing(state),
+        if (devices.isNotEmpty && state.offer == null) ...[
           Text(
-            'Sessions arrive while this app is open. Otherwise your computer '
-            'holds them and sends them after your next Claude Code prompt '
-            'with the app open.',
+            _isVsCode
+                ? 'Install the WorkPulse extension from companion/vscode on '
+                      'a paired computer and it uses that pairing. Coding '
+                      'time arrives while this app is open; until then the '
+                      'computer holds it.'
+                : 'Sessions arrive while this app is open. Otherwise your '
+                      'computer holds them and sends them after your next '
+                      'Claude Code prompt with the app open.',
             style: AppText.caption.copyWith(fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: _controller.beginPairing,
+            child: const Text('Pair another computer'),
           ),
           const SizedBox(height: 20),
         ],
@@ -119,9 +137,11 @@ class _ClaudeCodeScreenState extends ConsumerState<ClaudeCodeScreen> {
         ),
         const SizedBox(height: 16),
         const SectionTitle('Never'),
-        const Text(
-          'Your prompts, Claude’s responses, file contents or full file '
-          'paths.',
+        Text(
+          _isVsCode
+              ? 'File contents, file names, full paths or anything you type.'
+              : 'Your prompts, Claude’s responses, file contents or full file '
+                    'paths.',
           style: AppText.caption,
         ),
       ],
@@ -177,8 +197,11 @@ class _ClaudeCodeScreenState extends ConsumerState<ClaudeCodeScreen> {
     final seconds = left.inSeconds.remainder(60).toString().padLeft(2, '0');
     return [
       Text(
-        'Keep this screen open. In the WorkPulse project folder on your '
-        'computer, run these two commands.',
+        _isVsCode
+            ? 'Keep this screen open. In VS Code, run “WorkPulse: Pair with '
+                  'phone” from the Command Palette and enter these.'
+            : 'Keep this screen open. In the WorkPulse project folder on '
+                  'your computer, run these two commands.',
         style: Theme.of(context).textTheme.bodyMedium
             ?.copyWith(color: AppColors.textSecondary),
       ),
@@ -202,10 +225,12 @@ class _ClaudeCodeScreenState extends ConsumerState<ClaudeCodeScreen> {
         ),
       ),
       const SizedBox(height: 16),
-      _CommandBox(step: '1', command: pairCommand),
-      const SizedBox(height: 10),
-      _CommandBox(step: '2', command: installCommand),
-      const SizedBox(height: 16),
+      if (!_isVsCode) ...[
+        _CommandBox(step: '1', command: pairCommand),
+        const SizedBox(height: 10),
+        _CommandBox(step: '2', command: installCommand),
+        const SizedBox(height: 16),
+      ],
       const WaitingRow('Waiting for your computer…'),
       const SizedBox(height: 20),
     ];

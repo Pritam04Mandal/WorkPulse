@@ -1,4 +1,6 @@
-/// One stretch of Claude Code work, as reported by the computer.
+enum SegmentSource { claudeCode, vscode }
+
+/// One stretch of work, as reported by a paired computer.
 class ClaudeSegment {
   const ClaudeSegment({
     required this.id,
@@ -6,6 +8,7 @@ class ClaudeSegment {
     required this.startMs,
     required this.endMs,
     this.repository,
+    this.source = SegmentSource.claudeCode,
   });
 
   final String id;
@@ -13,6 +16,7 @@ class ClaudeSegment {
   final int startMs;
   final int endMs;
   final String? repository;
+  final SegmentSource source;
 
   static final _idPattern = RegExp(r'^[A-Za-z0-9_.:-]{1,120}$');
   static const _longest = Duration(hours: 24);
@@ -26,6 +30,12 @@ class ClaudeSegment {
       'end': final int end,
     }) {
       final repository = raw['repo'];
+      final source = switch (raw['kind']) {
+        null || 'claude_code' => SegmentSource.claudeCode,
+        'vscode' => SegmentSource.vscode,
+        _ => null,
+      };
+      if (source == null) return null;
       if (!_idPattern.hasMatch(id) ||
           project.isEmpty ||
           project.length > 100 ||
@@ -42,6 +52,7 @@ class ClaudeSegment {
         startMs: start,
         endMs: end,
         repository: repository as String?,
+        source: source,
       );
     }
     return null;

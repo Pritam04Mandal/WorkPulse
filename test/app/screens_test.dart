@@ -227,6 +227,7 @@ void main() {
   for (final (route, expected) in const [
     ('/home', 'Today'),
     ('/integrations/claude', 'Claude Code'),
+    ('/integrations/vscode', 'VS Code'),
     ('/integrations/github', 'Not connected'),
     ('/integrations/github/connect', 'isn’t configured'),
     ('/timeline', 'Timeline'),

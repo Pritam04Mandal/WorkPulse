@@ -75,6 +75,7 @@ class TrackedActivity {
   String get sourceLabel => switch (kind) {
     ActivityKind.appUsage => 'Android usage',
     ActivityKind.aiSession => 'Claude Code',
+    ActivityKind.codingSession => 'VS Code',
     _ => 'GitHub',
   };
 }

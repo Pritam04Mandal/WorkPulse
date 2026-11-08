@@ -49,6 +49,7 @@ app.*.map.json
 
 # Local secrets: OAuth client IDs and signature hashes are never committed
 .env
+*.vsix
 dart_defines*.json
 *.jks
 *.keystore

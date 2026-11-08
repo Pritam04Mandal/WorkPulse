@@ -8,6 +8,7 @@ import '../domain/pairing_crypto.dart';
 import 'companion_secrets.dart';
 
 const claudeCodeApplication = 'claude-code';
+const vscodeApplication = 'vscode';
 
 class CompanionRepository {
   CompanionRepository({
@@ -73,6 +74,7 @@ class CompanionRepository {
         if (segment.startMs < floor || tombstones.contains(externalId)) {
           continue;
         }
+        final isVsCode = segment.source == SegmentSource.vscode;
         final end = DateTime.fromMillisecondsSinceEpoch(segment.endMs);
         await _db
             .into(_db.activityEvents)
@@ -80,10 +82,17 @@ class CompanionRepository {
               ActivityEventsCompanion.insert(
                 sourceId: source.id,
                 externalId: Value(externalId),
-                kind: ActivityKind.aiSession,
-                category: ActivityCategory.ai,
-                title: 'Claude Code · ${segment.project}',
-                application: const Value(claudeCodeApplication),
+                kind: isVsCode
+                    ? ActivityKind.codingSession
+                    : ActivityKind.aiSession,
+                category: isVsCode
+                    ? ActivityCategory.coding
+                    : ActivityCategory.ai,
+                title:
+                    '${isVsCode ? 'VS Code' : 'Claude Code'} · ${segment.project}',
+                application: Value(
+                  isVsCode ? vscodeApplication : claudeCodeApplication,
+                ),
                 domain: Value(segment.repository),
                 startedAt: DateTime.fromMillisecondsSinceEpoch(segment.startMs),
                 endedAt: Value(end),

@@ -1,0 +1,30 @@
+{
+  "name": "workpulse",
+  "displayName": "WorkPulse",
+  "description": "Sends your VS Code coding time to the WorkPulse app on your phone. Times and project names only.",
+  "version": "0.1.0",
+  "publisher": "workpulse",
+  "private": true,
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "extensionKind": ["ui"],
+  "main": "./src/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "commands": [
+      {
+        "command": "workpulse.pair",
+        "title": "WorkPulse: Pair with phone"
+      },
+      {
+        "command": "workpulse.status",
+        "title": "WorkPulse: Show status"
+      }
+    ]
+  },
+  "scripts": {
+    "test": "node --test test/"
+  }
+}

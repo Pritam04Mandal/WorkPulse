@@ -26,6 +26,12 @@ to the phone over the local network. It needs only Python 3.8+. Open
 send only times, the folder name and the repository name; events are signed
 but not encrypted on the local network.
 
+## VS Code
+
+`companion/vscode` is a dependency-free extension that sends coding time over
+the same pairing. Package it with
+`npx @vscode/vsce package --allow-missing-repository --skip-license`.
+
 ## Layout
 
 ```

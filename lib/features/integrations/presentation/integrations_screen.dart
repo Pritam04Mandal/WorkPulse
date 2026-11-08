@@ -27,14 +27,6 @@ const _otherItems = [
     route: '/integrations/pair',
   ),
   (
-    mono: 'DC',
-    name: 'Desktop companion',
-    detail: 'VS Code, Zed, git · 1 device',
-    status: 'Connected',
-    color: AppColors.accent,
-    route: '/integrations/pair?device=desktop',
-  ),
-  (
     mono: 'GL',
     name: 'GitLab or GitHub Enterprise',
     detail: 'Add a company or self-hosted instance',
@@ -97,6 +89,16 @@ class IntegrationsScreen extends ConsumerWidget {
         status: claude.isEmpty ? 'Add' : 'Paired',
         color: claude.isEmpty ? AppColors.coding : AppColors.accent,
         route: '/integrations/claude' as String?,
+      ),
+      (
+        mono: 'VS',
+        name: 'VS Code',
+        detail: claude.isEmpty
+            ? 'Coding time from your computer'
+            : 'Uses your computer’s pairing',
+        status: claude.isEmpty ? 'Add' : 'Ready',
+        color: claude.isEmpty ? AppColors.coding : AppColors.accent,
+        route: '/integrations/vscode' as String?,
       ),
       ..._otherItems,
     ];

@@ -119,6 +119,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const ClaudeCodeScreen(),
           ),
           GoRoute(
+            path: 'vscode',
+            builder: (context, state) =>
+                const ClaudeCodeScreen(app: CompanionApp.vscode),
+          ),
+          GoRoute(
             path: 'teams',
             builder: (context, state) => const TeamsConnectScreen(),
           ),

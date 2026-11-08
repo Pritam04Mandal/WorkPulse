@@ -203,6 +203,76 @@ void main() {
     expect('${(await run(['status'])).stdout}', contains('waiting to send: 0'));
   });
 
+  group('VS Code extension protocol', () {
+    const client = 'companion/vscode/test/e2e_client.js';
+
+    Future<ProcessResult> node(List<String> arguments) =>
+        Process.run('node', [client, ...arguments], environment: env);
+
+    test('pairs and sends coding time', () async {
+      final code = server.beginPairing().code;
+      final paired = await node(['pair', address(), code]);
+      expect(paired.exitCode, 0, reason: '${paired.stderr}');
+
+      final device = await db.select(db.pairedDevices).getSingle();
+      final config = jsonDecode(
+        File('${home.path}/state/config.json').readAsStringSync(),
+      ) as Map<String, dynamic>;
+      expect(secrets.values[device.id], config['secret']);
+
+      final start = DateTime.now().millisecondsSinceEpoch - 120000;
+      final sent = await node(['send', 'my-app', '$start', '${start + 60000}']);
+      expect(sent.stdout, 'sent', reason: '${sent.stderr}');
+
+      final row = (await events()).single;
+      expect(row.kind, ActivityKind.codingSession);
+      expect(row.category, ActivityCategory.coding);
+      expect(row.title, 'VS Code · my-app');
+      expect(row.application, vscodeApplication);
+      expect(row.domain, 'me/app');
+    });
+
+    test('uses a pairing made by the Claude script', () async {
+      await pairDevice();
+
+      final start = DateTime.now().millisecondsSinceEpoch - 120000;
+      final sent = await node(['send', 'shared', '$start', '${start + 1000}']);
+
+      expect(sent.stdout, 'sent', reason: '${sent.stderr}');
+      expect(await events(), hasLength(1));
+    });
+
+    test('the wrong code is rejected', () async {
+      server.beginPairing();
+      final paired = await node(['pair', address(), 'nope']);
+      expect(paired.exitCode, 1);
+      expect('${paired.stderr}', contains('wrong or has expired'));
+      expect(await db.select(db.pairedDevices).get(), isEmpty);
+    });
+  });
+
+  test('an unknown segment kind is refused by the parser', () {
+    final now = DateTime(2026, 11, 9, 12);
+    final start = now.millisecondsSinceEpoch - 1000;
+    Object segment(String? kind) => {
+      'id': 'a.1',
+      'project': 'p',
+      'start': start,
+      'end': start + 500,
+      'kind': ?kind,
+    };
+
+    expect(
+      ClaudeSegment.parse(segment('vscode'), now: now)?.source,
+      SegmentSource.vscode,
+    );
+    expect(
+      ClaudeSegment.parse(segment(null), now: now)?.source,
+      SegmentSource.claudeCode,
+    );
+    expect(ClaudeSegment.parse(segment('mystery'), now: now), isNull);
+  });
+
   group('rejected events', () {
     Future<HttpClientResponse> send(
       Map<String, String> headers,
