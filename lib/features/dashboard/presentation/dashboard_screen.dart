@@ -12,6 +12,9 @@ import '../../../core/widgets/app_widgets.dart';
 import '../../auth/presentation/session_controller.dart';
 import '../../companion/presentation/companion_controller.dart';
 import '../../github/presentation/github_controller.dart';
+import '../../projects/domain/project.dart';
+import '../../projects/domain/project_matcher.dart';
+import '../../projects/presentation/project_providers.dart';
 import '../../tracking/domain/usage_models.dart';
 import '../../tracking/presentation/tracking_controller.dart';
 import '../domain/dashboard_summary.dart';
@@ -25,10 +28,12 @@ final dashboardSummaryProvider = Provider<DashboardSummary>((ref) {
   final today = startOfDay(DateTime.now());
   final activities = ref.watch(dayActivitiesProvider(today)).value ?? const [];
   final github = ref.watch(githubStatusProvider).value;
+  final projects = ref.watch(projectsProvider).value ?? const <Project>[];
   return buildDashboardSummary(
     activities,
     usageGranted: granted,
     githubConnected: github?.connected ?? false,
+    projectOf: (a) => matchProject(a, projects)?.id,
   );
 });
 

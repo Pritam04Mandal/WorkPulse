@@ -22,7 +22,7 @@ abstract final class AppColors {
   static const meetings = Color(0xFFF0A35E);
   static const other = Color(0xFF4A4F57);
 
-  /// Also marks inferred and sample data.
+  /// Also marks inferred data.
   static const amber = Color(0xFFF0A35E);
   static const amberBorder = Color(0xFF5A3F24);
   static const amberTint = Color(0xFF221A12);

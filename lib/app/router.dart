@@ -9,10 +9,7 @@ import '../features/insights/presentation/insights_screen.dart';
 import '../features/integrations/presentation/claude_code_screen.dart';
 import '../features/integrations/presentation/github_connect_screen.dart';
 import '../features/integrations/presentation/integrations_screen.dart';
-import '../features/integrations/presentation/pair_device_screen.dart';
-import '../features/integrations/presentation/self_hosted_git_screen.dart';
 import '../features/integrations/presentation/source_detail_screen.dart';
-import '../features/integrations/presentation/teams_connect_screen.dart';
 import '../features/journal/presentation/journal_screen.dart';
 import '../features/onboarding/presentation/sign_in_screen.dart';
 import '../features/onboarding/presentation/usage_access_screen.dart';
@@ -123,20 +120,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) =>
                 const ClaudeCodeScreen(app: CompanionApp.vscode),
           ),
-          GoRoute(
-            path: 'teams',
-            builder: (context, state) => const TeamsConnectScreen(),
-          ),
-          GoRoute(
-            path: 'pair',
-            builder: (context, state) => PairDeviceScreen(
-              desktop: state.uri.queryParameters['device'] == 'desktop',
-            ),
-          ),
-          GoRoute(
-            path: 'add-git',
-            builder: (context, state) => const SelfHostedGitScreen(),
-          ),
         ],
       ),
       StatefulShellRoute.indexedStack(
@@ -162,12 +145,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           _tab('/insights', const InsightsScreen()),
           _tab('/settings', const SettingsScreen(), [
             _pushed('profile', (context, state) => const ProfileScreen()),
-            _pushed(
-              'exclusions',
-              (context, state) => ExclusionsScreen(
-                showSites: state.uri.queryParameters['tab'] == 'sites',
-              ),
-            ),
+            _pushed('exclusions', (context, state) => const ExclusionsScreen()),
             _pushed(
               'delete-data',
               (context, state) => const DeleteDataScreen(),

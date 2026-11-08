@@ -76,8 +76,8 @@ class _DeleteDataScreenState extends ConsumerState<DeleteDataScreen> {
                 Text('All local data deleted', style: text.headlineSmall),
                 const SizedBox(height: 12),
                 Text(
-                  'Also revoke WorkPulse in your Google and Microsoft account '
-                  'settings if you won’t use it again.',
+                  'Also revoke WorkPulse in your Google and GitHub account settings if '
+                  'you won’t use it again.',
                   style: body,
                 ),
               ]

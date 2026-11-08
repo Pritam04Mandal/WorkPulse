@@ -97,9 +97,7 @@ class CompanionRepository {
                 kind: isVsCode
                     ? ActivityKind.codingSession
                     : ActivityKind.aiSession,
-                category: isVsCode
-                    ? ActivityCategory.coding
-                    : ActivityCategory.ai,
+                category: ActivityCategory.coding,
                 title:
                     '${isVsCode ? 'VS Code' : 'Claude Code'} · ${segment.project}',
                 application: Value(

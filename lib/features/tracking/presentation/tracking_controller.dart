@@ -20,6 +20,13 @@ final dayActivitiesProvider = StreamProvider.autoDispose
       (ref, day) => ref.watch(trackingRepositoryProvider).watchDay(day),
     );
 
+/// Everything from `start` (inclusive) to `end` (exclusive).
+final rangeActivitiesProvider = StreamProvider.autoDispose
+    .family<List<TrackedActivity>, (DateTime, DateTime)>(
+      (ref, range) =>
+          ref.watch(trackingRepositoryProvider).watchRange(range.$1, range.$2),
+    );
+
 final activityProvider = StreamProvider.autoDispose
     .family<TrackedActivity?, String>(
       (ref, id) => ref.watch(trackingRepositoryProvider).watchActivity(id),

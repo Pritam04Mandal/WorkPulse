@@ -23,8 +23,8 @@ class ProfileScreen extends ConsumerWidget {
       (sheet) => SheetBody(
         title: 'Sign out?',
         body:
-            'Your activity stays on this phone. GitHub and Teams stay '
-            'connected; disconnect them separately.',
+            'Your activity stays on this phone. GitHub stays connected; '
+            'disconnect it separately.',
         actions: [
           DestructiveButton(
             label: 'Sign out',
@@ -62,10 +62,6 @@ class ProfileScreen extends ConsumerWidget {
               OutlinedButton(
                 onPressed: () => context.push('/sign-in/google'),
                 child: const Text('Sign in with Google'),
-              ),
-              OutlinedButton(
-                onPressed: () => context.push('/sign-in/microsoft'),
-                child: const Text('Sign in with Microsoft'),
               ),
             ]
           : [

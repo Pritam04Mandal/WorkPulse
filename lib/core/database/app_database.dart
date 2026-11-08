@@ -41,7 +41,14 @@ class AppDatabase extends _$AppDatabase {
     onUpgrade: (m, from, to) async {
       throw UnsupportedError('No migration from schema $from to $to');
     },
-    beforeOpen: (details) => customStatement('PRAGMA foreign_keys = ON'),
+    beforeOpen: (details) async {
+      await customStatement('PRAGMA foreign_keys = ON');
+      // Early Claude Code sessions were saved as AI; they count as coding.
+      await customStatement(
+        "UPDATE activity_events SET category = 'coding' "
+        "WHERE application = 'claude-code' AND category = 'ai'",
+      );
+    },
   );
 
   Future<String?> readSetting(String key) async {

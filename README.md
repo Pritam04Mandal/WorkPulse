@@ -11,8 +11,8 @@ Build notes: [build-handoff.md](build-handoff.md)
 Every design screen is built. Android usage tracking drives Home, Timeline,
 Activity detail and app exclusions, and it catches up from Android's usage log
 each time the app opens. Onboarding, sign-in, Profile, sign-out, Private
-session and Delete all data are also real. Everything marked `SAMPLE DATA`
-uses in-memory examples until Teams and the paired devices land. GitHub
+session and Delete all data are also real, and Projects, Insights and Journal
+are built from recorded activity. GitHub
 connects with Device Flow and syncs commits, pull requests, reviews and issues.
 
 The database tables other than `users` were derived from the design canvas,

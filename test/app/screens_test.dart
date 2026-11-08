@@ -199,33 +199,13 @@ void main() {
     await closing;
   }
 
-  final sampleRoutes = <String, String>{
-    '/projects': 'Projects',
-    '/insights': 'Insights',
-    '/projects/workpulse-app': 'workpulse-app',
-    '/projects/client-meetings': 'Client meetings',
-    '/projects/new': 'New project',
-    '/projects/billing-api/edit': 'Edit project',
-    '/home/journal': 'Main projects',
-    '/integrations': 'Integrations',
-    '/integrations/teams': 'Microsoft Teams',
-    '/integrations/pair': 'Pair a device',
-  };
-
-  for (final MapEntry(key: route, value: expected) in sampleRoutes.entries) {
-    testWidgets('$route renders, labelled as sample data', (tester) async {
-      await pumpApp(tester);
-      container.read(routerProvider).go(route);
-      await settle(tester);
-
-      expect(find.textContaining(expected), findsWidgets);
-      expect(find.text('SAMPLE DATA').hitTestable(), findsWidgets);
-      await finish(tester);
-    });
-  }
-
   for (final (route, expected) in const [
     ('/home', 'Today'),
+    ('/projects', 'No projects yet'),
+    ('/insights', 'Nothing recorded for this period'),
+    ('/projects/new', 'New project'),
+    ('/home/journal', 'Nothing recorded yet'),
+    ('/integrations', 'Integrations'),
     ('/integrations/claude', 'Claude Code'),
     ('/integrations/vscode', 'VS Code'),
     ('/integrations/github', 'Not connected'),
@@ -235,7 +215,6 @@ void main() {
     ('/settings/exclusions', 'Chrome'),
     ('/settings/profile', 'Local profile'),
     ('/settings/delete-data', 'Delete all data'),
-    ('/integrations/add-git', 'Add Git instance'),
     ('/usage-access', 'Allow Usage Access'),
   ]) {
     testWidgets('$route renders', (tester) async {
@@ -244,6 +223,9 @@ void main() {
       await settle(tester);
 
       expect(find.textContaining(expected), findsWidgets);
+      expect(find.textContaining('SAMPLE'), findsNothing);
+      expect(find.textContaining('Microsoft'), findsNothing);
+      expect(find.textContaining('Teams'), findsNothing);
       await finish(tester);
     });
   }
@@ -299,9 +281,15 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Create project'));
     await settle(tester);
+    await settle(tester);
+    await settle(tester);
 
     expect(find.text('mobile-release'), findsWidgets);
-    expect(find.textContaining('~/code/mobile-release'), findsOneWidget);
+    expect(find.text('Matching rules'), findsOneWidget);
+    await tester.runAsync(() async {
+      final rows = await db.select(db.projects).get();
+      expect(rows.single.name, 'mobile-release');
+    });
     await finish(tester);
   });
 

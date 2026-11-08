@@ -92,10 +92,6 @@ class SettingsScreen extends ConsumerWidget {
               onTap: () => context.push('/settings/exclusions'),
             ),
             NavRow(
-              title: 'Excluded websites',
-              onTap: () => context.push('/settings/exclusions?tab=sites'),
-            ),
-            NavRow(
               title: 'Usage Access',
               value: tracking.usageGranted ? 'Granted' : 'Not granted',
               onTap: () => context.push('/usage-access'),

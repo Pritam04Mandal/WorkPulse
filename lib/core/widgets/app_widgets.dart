@@ -2,29 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
 
-/// Marks any screen that shows made-up data.
-class SampleDataChip extends StatelessWidget {
-  const SampleDataChip({super.key});
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-    decoration: BoxDecoration(
-      color: AppColors.amberTint,
-      border: Border.all(color: AppColors.amberBorder),
-      borderRadius: BorderRadius.circular(4),
-    ),
-    child: Text(
-      'SAMPLE DATA',
-      style: AppText.mono(
-        size: 11,
-        weight: FontWeight.w600,
-        color: AppColors.amber,
-      ),
-    ),
-  );
-}
-
 /// A bordered tappable card.
 class AppCard extends StatelessWidget {
   const AppCard({

@@ -83,3 +83,7 @@ class TrackedActivity {
 }
 
 DateTime startOfDay(DateTime time) => DateTime(time.year, time.month, time.day);
+
+/// Monday of the week containing [time].
+DateTime startOfWeek(DateTime time) =>
+    DateTime(time.year, time.month, time.day - (time.weekday - 1));

@@ -72,7 +72,7 @@ class WelcomeScreen extends ConsumerWidget {
                     const _Promise(
                       icon: Icons.link,
                       title: 'Every source is opt-in',
-                      body: 'Connect GitHub or Teams separately, disconnect any time.',
+                      body: 'Connect GitHub and your editors separately, disconnect any time.',
                     ),
                     const Spacer(),
                     const SizedBox(height: 32),
@@ -83,21 +83,13 @@ class WelcomeScreen extends ConsumerWidget {
                       onPressed: () => context.push('/sign-in/google'),
                     ),
                     const SizedBox(height: 12),
-                    _ProviderButton(
-                      label: 'Continue with Microsoft',
-                      badge: 'M',
-                      badgeRadius: 4,
-                      onPressed: () => context.push('/sign-in/microsoft'),
-                    ),
-                    const SizedBox(height: 12),
                     FilledButton(
                       onPressed: () => _continueLocally(context, ref),
                       child: const Text('Continue without account'),
                     ),
                     const SizedBox(height: 20),
                     const Text(
-                      'Signing in only identifies you (openid, profile, email). '
-                      "It doesn't connect Gmail, Calendar or Teams.",
+                      'Signing in only identifies you (openid, profile, email).',
                       textAlign: TextAlign.center,
                       style: AppText.caption,
                     ),

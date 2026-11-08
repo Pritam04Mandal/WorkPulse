@@ -191,13 +191,14 @@ void main() {
     ) async {
       await pumpApp(tester);
       expect(find.text('WorkPulse'), findsOneWidget);
+      expect(find.textContaining('Microsoft'), findsNothing);
+      expect(find.textContaining('Gmail'), findsNothing);
 
       await tapAndSettle(tester, 'Continue without account');
       expect(find.text('Allow Usage Access'), findsOneWidget);
 
       await tapAndSettle(tester, 'Not now');
       expect(find.text('Today'), findsOneWidget);
-      expect(find.text('SAMPLE DATA'), findsNothing);
       expect(find.text('ACTIVE TRACKING'), findsOneWidget);
       expect(find.byType(NavigationBar), findsOneWidget);
       expect(find.text('Settings'), findsOneWidget);

@@ -186,8 +186,8 @@ class _Success extends StatelessWidget {
         ],
         const SizedBox(height: 20),
         Text(
-          'Your profile is saved on this phone. No email, calendar or Teams '
-          'data was shared.',
+          'Your profile is saved on this phone. Nothing else from your account '
+          'was shared.',
           style: text.bodyMedium?.copyWith(color: AppColors.textSecondary),
         ),
       ],

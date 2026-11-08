@@ -1,88 +1,65 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/format/durations.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/app_widgets.dart';
 import '../../../core/widgets/detail_widgets.dart';
+import '../../projects/domain/project.dart';
+import '../../projects/presentation/project_providers.dart';
+import '../../tracking/domain/usage_models.dart';
+import '../../tracking/presentation/tracking_controller.dart';
+import '../domain/journal_report.dart';
 
-const _dayProjects = [
-  ('workpulse-app', Duration(minutes: 184)),
-  ('billing-api', Duration(minutes: 58)),
-  ('Unassigned', Duration(minutes: 72)),
-];
-
-const _dayGitHub = [
-  '4 commits to workpulse-app, incl. "Add drift migrations"',
-  'Opened PR #42, merged PR #39',
-  'Reviewed PR #17 on billing-api',
-];
-
-const _dayMeetings = [
-  ('Sprint planning', Duration(minutes: 45)),
-  ('Design sync', Duration(minutes: 20)),
-];
-
-const _dayCoding =
-    '2h 51m of editor time across 3 sessions. 5 AI assistant sessions '
-    '(1h 06m), 3 tagged to workpulse-app.';
-
-const _weekHighlights = [
-  'workpulse-app: 23 commits, 4 PRs (3 merged)',
-  'billing-api: 6h 05m, 1 review',
-  '6 meetings, 4h 25m in total',
-  'Busiest day: Tuesday, 7h 12m',
-];
-
-const _disclaimer =
-    'Built only from recorded events. Time is observed activity, not proof of '
-    'output.';
-
-class JournalScreen extends StatefulWidget {
+class JournalScreen extends ConsumerStatefulWidget {
   const JournalScreen({super.key});
 
   @override
-  State<JournalScreen> createState() => _JournalScreenState();
+  ConsumerState<JournalScreen> createState() => _JournalScreenState();
 }
 
-class _JournalScreenState extends State<JournalScreen> {
+class _JournalScreenState extends ConsumerState<JournalScreen> {
   var _weekly = false;
 
-  /// The plain-text form of the visible report. Sample content for now.
-  String _reportText() {
-    final lines = _weekly
-        ? [
-            'Week of 2 November (sample data)',
-            'Tracked 34h 10m, attributed 28h 05m',
-            ..._weekHighlights.map((h) => '- $h'),
-          ]
-        : [
-            'Sunday, 8 November (sample data)',
-            for (final (name, time) in _dayProjects)
-              '$name: ${formatDuration(time)}',
-            ..._dayGitHub.map((g) => '- $g'),
-            for (final (name, time) in _dayMeetings)
-              '$name: ${formatDuration(time)}',
-            _dayCoding,
-          ];
-    return [...lines, _disclaimer].join('\n');
+  JournalReport _report() {
+    final now = DateTime.now();
+    final projects = ref.watch(projectsProvider).value ?? const <Project>[];
+    if (_weekly) {
+      final range = currentWeekRange();
+      return buildWeeklyReport(
+        ref.watch(rangeActivitiesProvider(range)).value ?? const [],
+        projects,
+        range.$1,
+      );
+    }
+    final today = startOfDay(now);
+    return buildDailyReport(
+      ref.watch(dayActivitiesProvider(today)).value ?? const [],
+      projects,
+      today,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final report = _report();
     final text = Theme.of(context).textTheme;
+    final body = text.bodySmall?.copyWith(color: AppColors.textSecondary);
+
     return DetailPage(
-      sample: true,
       footer: [
         Row(
           spacing: 10,
           children: [
             Expanded(
               child: OutlinedButton(
-                onPressed: () => copyToClipboard(
-                  context,
-                  _reportText(),
-                  'Report copied as plain text',
-                ),
+                onPressed: report.isEmpty
+                    ? null
+                    : () => copyToClipboard(
+                        context,
+                        report.toPlainText(),
+                        'Report copied as plain text',
+                      ),
                 child: const Text('Copy'),
               ),
             ),
@@ -108,57 +85,45 @@ class _JournalScreenState extends State<JournalScreen> {
           onChanged: (weekly) => setState(() => _weekly = weekly),
         ),
         const SizedBox(height: 16),
-        Text(
-          _weekly ? 'Week of 2 November' : 'Sunday, 8 November',
-          style: text.headlineSmall,
-        ),
+        Text(report.heading, style: text.headlineSmall),
         const SizedBox(height: 4),
-        Text(
-          _weekly
-              ? 'Rule-based · from 1,842 events across 3 sources'
-              : 'Rule-based · from 312 events · 5h 42m tracked',
-          style: AppText.caption,
-        ),
+        Text(report.basis, style: AppText.caption),
         const SizedBox(height: 16),
-        if (_weekly) ...[
-          const _Section(
+        if (report.tracked != null && !report.isEmpty)
+          _Section(
             children: [
-              _ValueRow('Tracked', Duration(minutes: 2050)),
-              _ValueRow('Attributed', Duration(minutes: 1685)),
+              _ValueRow('Tracked', report.tracked!),
+              _ValueRow('Attributed', report.attributed!),
             ],
           ),
-          _Section(
-            title: 'Highlights',
-            children: [for (final h in _weekHighlights) _Bullet(h)],
-          ),
-        ] else ...[
+        if (report.projects.isNotEmpty)
           _Section(
             title: 'Main projects',
             children: [
-              for (final (name, time) in _dayProjects) _ValueRow(name, time),
+              for (final (name, time) in report.projects) _ValueRow(name, time),
             ],
           ),
+        if (report.github.isNotEmpty)
           _Section(
             title: 'GitHub',
-            children: [for (final g in _dayGitHub) _Bullet(g)],
-          ),
-          _Section(
-            title: 'Meetings',
             children: [
-              for (final (name, time) in _dayMeetings) _ValueRow(name, time),
+              for (final line in report.github) Text('–  $line', style: body),
             ],
           ),
+        if (report.highlights.isNotEmpty)
+          _Section(
+            title: 'Highlights',
+            children: [
+              for (final line in report.highlights)
+                Text('–  $line', style: body),
+            ],
+          ),
+        if (report.codingSummary != null)
           _Section(
             title: 'Coding & AI',
-            children: [
-              Text(
-                _dayCoding,
-                style: text.bodySmall?.copyWith(color: AppColors.textSecondary),
-              ),
-            ],
+            children: [Text(report.codingSummary!, style: body)],
           ),
-        ],
-        const Text(_disclaimer, style: AppText.caption),
+        const Text(journalDisclaimer, style: AppText.caption),
       ],
     );
   }
@@ -202,18 +167,5 @@ class _ValueRow extends StatelessWidget {
       ),
       Text(formatDuration(time), style: AppText.mono(size: 13)),
     ],
-  );
-}
-
-class _Bullet extends StatelessWidget {
-  const _Bullet(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Text(
-    '–  $text',
-    style: Theme.of(context).textTheme.bodySmall
-        ?.copyWith(color: AppColors.textSecondary),
   );
 }

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/tokens.dart';
-import 'app_widgets.dart';
 
 /// Shown by controls whose real behaviour arrives with the integrations.
 const notAvailableYet = 'Not available yet. This arrives with real data.';
@@ -29,7 +28,6 @@ class DetailPage extends StatelessWidget {
     this.title,
     this.actions = const [],
     this.footer = const [],
-    this.sample = false,
     this.showBack = true,
     super.key,
   });
@@ -38,7 +36,6 @@ class DetailPage extends StatelessWidget {
   final List<Widget> actions;
   final List<Widget> children;
   final List<Widget> footer;
-  final bool sample;
   final bool showBack;
 
   @override
@@ -46,11 +43,7 @@ class DetailPage extends StatelessWidget {
     appBar: AppBar(
       automaticallyImplyLeading: showBack,
       title: title == null ? null : Text(title!),
-      actions: [
-        ...actions,
-        if (sample) const Center(child: SampleDataChip()),
-        const SizedBox(width: 16),
-      ],
+      actions: [...actions, const SizedBox(width: 16)],
     ),
     body: SafeArea(
       child: Column(

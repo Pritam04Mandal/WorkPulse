@@ -117,7 +117,11 @@ DashboardSummary buildDashboardSummary(
   List<TrackedActivity> activities, {
   required bool usageGranted,
   bool githubConnected = false,
+  String? Function(TrackedActivity)? projectOf,
 }) {
+  String? project(TrackedActivity a) =>
+      projectOf == null ? a.projectId : projectOf(a);
+
   final visible = activities.where((a) => !a.isPrivate).toList();
   final timed = visible.where((a) => a.duration != null).toList();
 
@@ -163,8 +167,8 @@ DashboardSummary buildDashboardSummary(
       plural(countKind(ActivityKind.issue), 'issue'),
   ].join(' · ');
   final sources = visible.map((a) => a.sourceLabel).toSet();
-  final projects = visible.map((a) => a.projectId).nonNulls.toSet().length;
-  final unassigned = totalOf(timed.where((a) => a.projectId == null));
+  final projects = visible.map(project).nonNulls.toSet().length;
+  final unassigned = totalOf(timed.where((a) => project(a) == null));
 
   return DashboardSummary(
     categories: [

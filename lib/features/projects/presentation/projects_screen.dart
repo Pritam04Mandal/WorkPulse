@@ -6,15 +6,31 @@ import '../../../core/format/durations.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/app_widgets.dart';
 import '../../../core/widgets/detail_widgets.dart';
-import '../data/sample_projects.dart';
+import '../../tracking/domain/usage_models.dart';
+import '../../tracking/presentation/tracking_controller.dart';
 import '../domain/project.dart';
+import '../domain/project_matcher.dart';
+import 'project_providers.dart';
 
 class ProjectsScreen extends ConsumerWidget {
   const ProjectsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final projects = ref.watch(sampleProjectsProvider);
+    final projects = ref.watch(projectsProvider).value ?? const <Project>[];
+    final stats = ref.watch(projectWeekStatsProvider);
+    final today =
+        ref.watch(dayActivitiesProvider(startOfDay(DateTime.now()))).value ??
+        const <TrackedActivity>[];
+    final unassigned = today
+        .where((a) => !a.isPrivate && a.duration != null)
+        .where((a) => matchProject(a, projects) == null)
+        .toList();
+    final unassignedTime = unassigned.fold(
+      Duration.zero,
+      (sum, a) => sum + a.duration!,
+    );
+
     return Scaffold(
       body: SafeArea(
         child: ListView(
@@ -30,67 +46,24 @@ class ProjectsScreen extends ConsumerWidget {
                 ),
               ],
             ),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'This week · ${projects.length} active',
-                    style: AppText.caption.copyWith(fontSize: 13),
-                  ),
-                ),
-                const SampleDataChip(),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Material(
-              color: AppColors.amberTint,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(color: AppColors.amberBorder),
+            if (projects.isNotEmpty)
+              Text(
+                'This week · ${projects.length} active',
+                style: AppText.caption.copyWith(fontSize: 13),
               ),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: () => context.go('/timeline'),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '1h 12m unassigned today',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              '6 events need a project',
-                              style: AppText.caption,
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        'Review',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.amber,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
             const SizedBox(height: 14),
-            for (final project in projects) ...[
-              _ProjectCard(project: project),
-              const SizedBox(height: 12),
+            if (projects.isNotEmpty && unassigned.isNotEmpty) ...[
+              _UnassignedBanner(time: unassignedTime, count: unassigned.length),
+              const SizedBox(height: 14),
             ],
+            if (projects.isEmpty)
+              const _EmptyProjects()
+            else
+              for (final project in projects) ...[
+                if (stats[project.id] case final ProjectStats projectStats)
+                  _ProjectCard(project: project, stats: projectStats),
+                const SizedBox(height: 12),
+              ],
           ],
         ),
       ),
@@ -98,15 +71,100 @@ class ProjectsScreen extends ConsumerWidget {
   }
 }
 
+class _EmptyProjects extends StatelessWidget {
+  const _EmptyProjects();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 56),
+    child: Column(
+      spacing: 12,
+      children: [
+        const Icon(Icons.folder_outlined, size: 40, color: AppColors.other),
+        Text(
+          'No projects yet',
+          style: Theme.of(context).textTheme.titleMedium
+              ?.copyWith(fontSize: 16),
+        ),
+        Text(
+          'Create one and link a repository or folder. Matching activity is '
+          'added to it automatically.',
+          textAlign: TextAlign.center,
+          style: AppText.caption.copyWith(fontSize: 13),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(minimumSize: const Size(180, 48)),
+          onPressed: () => context.push('/projects/new'),
+          child: const Text('New project'),
+        ),
+      ],
+    ),
+  );
+}
+
+class _UnassignedBanner extends StatelessWidget {
+  const _UnassignedBanner({required this.time, required this.count});
+
+  final Duration time;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: AppColors.amberTint,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+      side: const BorderSide(color: AppColors.amberBorder),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
+      onTap: () => context.go('/timeline'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${formatDuration(time)} unassigned today',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    '$count ${count == 1 ? 'event matches' : 'events match'} '
+                    'no project',
+                    style: AppText.caption,
+                  ),
+                ],
+              ),
+            ),
+            const Text(
+              'Review',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.amber,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class _ProjectCard extends StatelessWidget {
-  const _ProjectCard({required this.project});
+  const _ProjectCard({required this.project, required this.stats});
 
   final Project project;
+  final ProjectStats stats;
 
   @override
   Widget build(BuildContext context) {
-    final hours = project.stats.dailyHours;
-    final peak = hours.fold<double>(0.01, (m, h) => h > m ? h : m);
+    final peak = stats.dailyHours.fold<double>(0.01, (m, h) => h > m ? h : m);
     return AppCard(
       padding: const EdgeInsets.all(16),
       onTap: () => context.push('/projects/${project.id}'),
@@ -133,7 +191,7 @@ class _ProjectCard extends StatelessWidget {
                 ),
               ),
               Text(
-                formatDuration(project.stats.week),
+                formatDuration(stats.week),
                 style: AppText.mono(size: 14, weight: FontWeight.w500),
               ),
             ],
@@ -149,7 +207,7 @@ class _ProjectCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               spacing: 4,
               children: [
-                for (final h in hours)
+                for (final h in stats.dailyHours)
                   Expanded(
                     child: Container(
                       height: (h / peak * 28).clamp(3, 28),
@@ -162,37 +220,10 @@ class _ProjectCard extends StatelessWidget {
               ],
             ),
           ),
-          Row(
-            spacing: 8,
-            children: [
-              Expanded(
-                child: Text(
-                  project.sources,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppText.caption,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: project.autoDiscovered
-                        ? AppColors.borderStrong
-                        : AppColors.accentTint,
-                  ),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  project.badge,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: project.autoDiscovered
-                        ? AppColors.muted
-                        : AppColors.accent,
-                  ),
-                ),
-              ),
-            ],
+          Text(
+            stats.sources.isEmpty ? 'No activity this week' : stats.sources,
+            overflow: TextOverflow.ellipsis,
+            style: AppText.caption,
           ),
         ],
       ),

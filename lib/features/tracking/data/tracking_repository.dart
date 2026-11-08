@@ -107,7 +107,10 @@ class TrackingRepository {
 
   Stream<List<TrackedActivity>> watchDay(DateTime day) {
     final start = startOfDay(day);
-    final end = DateTime(start.year, start.month, start.day + 1);
+    return watchRange(start, DateTime(start.year, start.month, start.day + 1));
+  }
+
+  Stream<List<TrackedActivity>> watchRange(DateTime start, DateTime end) {
     final query = _db.select(_db.activityEvents)
       ..where(
         (t) =>

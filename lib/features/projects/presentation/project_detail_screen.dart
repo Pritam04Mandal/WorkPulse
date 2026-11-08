@@ -2,15 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/domain/enums.dart';
 import '../../../core/format/durations.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/app_widgets.dart';
 import '../../../core/widgets/detail_widgets.dart';
 import '../../../core/widgets/hour_bars.dart';
-import '../data/sample_projects.dart';
 import '../domain/project.dart';
+import 'project_providers.dart';
 
-const _ruleKinds = ['App', 'Path', 'Site', 'Repo'];
+const _ruleKinds = [
+  (RuleKind.repo, 'Repo'),
+  (RuleKind.path, 'Path'),
+  (RuleKind.app, 'App'),
+  (RuleKind.title, 'Title'),
+];
 
 class ProjectDetailScreen extends ConsumerStatefulWidget {
   const ProjectDetailScreen({required this.id, super.key});
@@ -24,7 +30,7 @@ class ProjectDetailScreen extends ConsumerStatefulWidget {
 
 class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   final _pattern = TextEditingController();
-  var _kind = _ruleKinds.first;
+  var _kind = RuleKind.repo;
   var _adding = false;
 
   @override
@@ -33,37 +39,70 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     super.dispose();
   }
 
-  void _saveRule(Project project) {
+  Future<void> _saveRule(Project project) async {
     final value = _pattern.text.trim();
     if (value.isEmpty) return;
-    ref
-        .read(sampleProjectsProvider.notifier)
-        .upsert(
+    await ref
+        .read(projectRepositoryProvider)
+        .save(
           project.copyWith(
             rules: [...project.rules, ProjectRuleItem(_kind, value)],
           ),
         );
     _pattern.clear();
-    setState(() => _adding = false);
+    if (mounted) setState(() => _adding = false);
+  }
+
+  Future<void> _removeRule(Project project, ProjectRuleItem rule) => ref
+      .read(projectRepositoryProvider)
+      .save(
+        project.copyWith(rules: project.rules.where((r) => r != rule).toList()),
+      );
+
+  Future<void> _askDelete(Project project) async {
+    final confirmed = await showAppSheet<bool>(
+      context,
+      (sheet) => SheetBody(
+        title: 'Delete ${project.name}?',
+        body:
+            'Your recorded activity stays. It just won’t belong to this '
+            'project any more.',
+        actions: [
+          DestructiveButton(
+            label: 'Delete project',
+            onPressed: () => Navigator.pop(sheet, true),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(sheet),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    context.pop();
+    await ref.read(projectRepositoryProvider).delete(project.id);
   }
 
   @override
   Widget build(BuildContext context) {
     Project? found;
-    for (final candidate in ref.watch(sampleProjectsProvider)) {
+    for (final candidate in ref.watch(projectsProvider).value ?? <Project>[]) {
       if (candidate.id == widget.id) found = candidate;
     }
-    if (found == null) {
-      return const DetailPage(
-        sample: true,
-        children: [Text('This project no longer exists.')],
+    final stats = ref.watch(projectWeekStatsProvider)[widget.id];
+    if (found == null || stats == null) {
+      return DetailPage(
+        children: [
+          if (ref.watch(projectsProvider).hasValue)
+            const Text('This project no longer exists.'),
+        ],
       );
     }
     final project = found;
     final text = Theme.of(context).textTheme;
 
     return DetailPage(
-      sample: true,
       actions: [
         IconButton(
           tooltip: 'Edit project',
@@ -104,10 +143,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 spacing: 8,
                 children: [
                   Text(
-                    formatDuration(project.stats.week),
+                    formatDuration(stats.week),
                     style: AppText.mono(size: 28, weight: FontWeight.w600),
                   ),
-                  const Text('this week · sample', style: AppText.caption),
+                  const Text('this week', style: AppText.caption),
                 ],
               ),
               const SizedBox(height: 16),
@@ -115,13 +154,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 labels: const ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
                 height: 72,
                 barWidth: 20,
-                series: [
-                  BarSeries('Tracked', project.color, project.stats.dailyHours),
-                ],
+                series: [BarSeries('Tracked', project.color, stats.dailyHours)],
               ),
-              if (project.stats.breakdown.isNotEmpty) ...[
+              if (stats.breakdown.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                for (final (label, time) in project.stats.breakdown)
+                for (final (label, time) in stats.breakdown)
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
                     child: Row(
@@ -150,9 +187,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           const SectionTitle('GitHub this week'),
           Row(
             children: [
-              _Count(project.stats.commits, 'commits'),
-              _Count(project.stats.pullRequests, 'PRs'),
-              _Count(project.stats.reviews, 'reviews'),
+              _Count(stats.commits, 'commits'),
+              _Count(stats.pullRequests, 'PRs'),
+              _Count(stats.reviews, 'reviews'),
             ],
           ),
         ],
@@ -170,9 +207,13 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             ),
           ],
         ),
+        if (project.rules.isEmpty && !_adding)
+          const Text(
+            'No rules yet. Add one so activity is assigned automatically.',
+            style: AppText.caption,
+          ),
         for (final rule in project.rules)
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 11),
             decoration: const BoxDecoration(
               border: Border(bottom: BorderSide(color: AppColors.divider)),
             ),
@@ -181,10 +222,19 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               children: [
                 SizedBox(
                   width: 40,
-                  child: Text(rule.kind, style: AppText.caption),
+                  child: Text(rule.label, style: AppText.caption),
                 ),
                 Expanded(
                   child: Text(rule.value, style: AppText.mono(size: 13)),
+                ),
+                IconButton(
+                  tooltip: 'Remove rule',
+                  onPressed: () => _removeRule(project, rule),
+                  icon: const Icon(
+                    Icons.close,
+                    size: 16,
+                    color: AppColors.muted,
+                  ),
                 ),
               ],
             ),
@@ -196,12 +246,12 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             children: [
               SizedBox(
                 width: 100,
-                child: DropdownButtonFormField<String>(
+                child: DropdownButtonFormField<RuleKind>(
                   initialValue: _kind,
                   dropdownColor: AppColors.surface,
                   items: [
-                    for (final kind in _ruleKinds)
-                      DropdownMenuItem(value: kind, child: Text(kind)),
+                    for (final (kind, label) in _ruleKinds)
+                      DropdownMenuItem(value: kind, child: Text(label)),
                   ],
                   onChanged: (kind) => setState(() => _kind = kind ?? _kind),
                 ),
@@ -223,7 +273,15 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         const SizedBox(height: 16),
         OutlinedButton(
           onPressed: () => context.go('/timeline'),
-          child: const Text('View project timeline'),
+          child: const Text('View timeline'),
+        ),
+        const SizedBox(height: 10),
+        TextButton(
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.destructiveText,
+          ),
+          onPressed: () => _askDelete(project),
+          child: const Text('Delete project'),
         ),
       ],
     );

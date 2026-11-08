@@ -156,7 +156,7 @@ void main() {
     );
     final row = rows.single;
     expect(row.kind, ActivityKind.aiSession);
-    expect(row.category, ActivityCategory.ai);
+    expect(row.category, ActivityCategory.coding);
     expect(row.application, claudeCodeApplication);
     expect(row.title, startsWith('Claude Code · '));
 

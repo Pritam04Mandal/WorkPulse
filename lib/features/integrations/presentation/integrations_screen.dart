@@ -11,28 +11,20 @@ import '../../tracking/presentation/tracking_controller.dart';
 
 const _otherItems = [
   (
-    mono: 'T',
-    name: 'Microsoft Teams',
-    detail: 'Calendar and meeting metadata',
-    status: 'Connected',
-    color: AppColors.accent,
-    route: '/integrations/teams',
-  ),
-  (
     mono: 'BX',
     name: 'Browser extension',
-    detail: 'Chrome · ChatGPT, Claude, domains',
-    status: 'Connected',
-    color: AppColors.accent,
-    route: '/integrations/pair',
+    detail: 'ChatGPT, Claude and website time',
+    status: 'Planned',
+    color: AppColors.muted,
+    route: null,
   ),
   (
     mono: 'GL',
     name: 'GitLab or GitHub Enterprise',
-    detail: 'Add a company or self-hosted instance',
-    status: 'Add',
-    color: AppColors.coding,
-    route: '/integrations/add-git',
+    detail: 'Company or self-hosted instances',
+    status: 'Planned',
+    color: AppColors.muted,
+    route: null,
   ),
   (
     mono: 'AI',
@@ -104,7 +96,6 @@ class IntegrationsScreen extends ConsumerWidget {
     ];
     return DetailPage(
       title: 'Integrations',
-      sample: true,
       children: [
         Text(
           'Each source is connected and removed on its own. Disconnecting asks '
@@ -165,12 +156,6 @@ class IntegrationsScreen extends ConsumerWidget {
               ),
             ),
           ),
-        const SizedBox(height: 16),
-        const Text(
-          'Signing in with Microsoft does not grant Teams access. Teams asks '
-          'for its own calendar permission. Chat messages are never read.',
-          style: AppText.caption,
-        ),
       ],
     );
   }

@@ -6,6 +6,8 @@ import '../../../core/domain/enums.dart';
 import '../../../core/format/durations.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/detail_widgets.dart';
+import '../../projects/domain/project_matcher.dart';
+import '../../projects/presentation/project_providers.dart';
 import '../../tracking/domain/usage_models.dart';
 import '../../tracking/presentation/tracking_controller.dart';
 import '../domain/timeline_builder.dart';
@@ -97,6 +99,7 @@ class ActivityDetailScreen extends ConsumerWidget {
 
     final text = Theme.of(context).textTheme;
     final repository = ref.read(trackingRepositoryProvider);
+    final projects = ref.watch(projectsProvider).value ?? const [];
     final kind = entryKindFor(activity);
     final hidden = activity.isPrivate;
     final categoryLabel = switch (kind) {
@@ -150,7 +153,11 @@ class ActivityDetailScreen extends ConsumerWidget {
                 ('Repository', activity.repository!, true),
               if (activity.application != null)
                 ('Application', activity.application!, true),
-              ('Project', 'No project', false),
+              (
+                'Project',
+                matchProject(activity, projects)?.name ?? 'No project',
+                false,
+              ),
               if (activity.kind == ActivityKind.aiSession)
                 ('Prompts', '${activity.mergedEvents}', true)
               else if (activity.mergedEvents > 1)
