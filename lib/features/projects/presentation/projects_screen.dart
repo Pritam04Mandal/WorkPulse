@@ -56,14 +56,12 @@ class ProjectsScreen extends ConsumerWidget {
               _UnassignedBanner(time: unassignedTime, count: unassigned.length),
               const SizedBox(height: 14),
             ],
-            if (projects.isEmpty)
-              const _EmptyProjects()
-            else
-              for (final project in projects) ...[
-                if (stats[project.id] case final ProjectStats projectStats)
-                  _ProjectCard(project: project, stats: projectStats),
-                const SizedBox(height: 12),
-              ],
+            for (final project in projects) ...[
+              if (stats[project.id] case final ProjectStats projectStats)
+                _ProjectCard(project: project, stats: projectStats),
+              const SizedBox(height: 12),
+            ],
+            if (projects.every((p) => p.isDefault)) const _EmptyProjects(),
           ],
         ),
       ),
@@ -76,13 +74,13 @@ class _EmptyProjects extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 56),
+    padding: const EdgeInsets.only(top: 32),
     child: Column(
       spacing: 12,
       children: [
         const Icon(Icons.folder_outlined, size: 40, color: AppColors.other),
         Text(
-          'No projects yet',
+          'No projects of your own yet',
           style: Theme.of(context).textTheme.titleMedium
               ?.copyWith(fontSize: 16),
         ),
@@ -197,7 +195,14 @@ class _ProjectCard extends StatelessWidget {
             ],
           ),
           Text(
-            project.repository ?? 'No repository',
+            project.isDefault
+                ? 'System apps'
+                : switch (project.repositories) {
+                    [] => 'No repository',
+                    [final only] => only,
+                    [final first, ...final rest] =>
+                      '$first +${rest.length} more',
+                  },
             style: AppText.mono(color: AppColors.muted),
             overflow: TextOverflow.ellipsis,
           ),

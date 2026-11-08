@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart';
 
 import '../../../core/database/app_database.dart' hide Project;
@@ -11,23 +13,74 @@ class ProjectRepository {
   final AppDatabase _db;
   final DateTime Function() _clock;
 
-  Stream<List<Project>> watchAll() async* {
-    yield await _load();
-    await for (final _ in _db.tableUpdates(
-      TableUpdateQuery.onAllTables([_db.projects, _db.projectRules]),
-    )) {
-      yield await _load();
+  /// Emits now and after every change. Built on a controller because a
+  /// generator waiting on an idle stream can't be cancelled until it wakes.
+  Stream<List<Project>> watchAll() {
+    late final StreamController<List<Project>> controller;
+    StreamSubscription<void>? updates;
+    var latest = Future<void>.value();
+    var active = true;
+
+    void publish() {
+      latest = latest.then((_) async {
+        if (!active) return;
+        try {
+          final projects = await _load();
+          if (active) controller.add(projects);
+        } catch (error, stack) {
+          // Closing the database mid-load is a StateError, and harmless here.
+          if (active) controller.addError(error, stack);
+        }
+      });
     }
+
+    controller = StreamController(
+      onListen: () {
+        publish();
+        updates = _db
+            .tableUpdates(
+              TableUpdateQuery.onAllTables([_db.projects, _db.projectRules]),
+            )
+            .listen((_) => publish());
+      },
+      onCancel: () {
+        active = false;
+        return updates?.cancel();
+      },
+    );
+    return controller.stream;
+  }
+
+  /// Keeps the built-in project present, including after a data wipe.
+  Future<void> _ensureDefault() async {
+    // Check first: every write wakes watchAll, so writing here would loop.
+    final existing = await (_db.select(
+      _db.projects,
+    )..where((t) => t.id.equals(usageProjectId))).getSingleOrNull();
+    if (existing != null) return;
+    await _db
+        .into(_db.projects)
+        .insert(
+          ProjectsCompanion.insert(
+            id: const Value(usageProjectId),
+            name: usageProjectName,
+            colorHex: usageProjectColor,
+            origin: ProjectOrigin.discovered,
+            createdAt: _clock(),
+          ),
+          mode: InsertMode.insertOrIgnore,
+        );
   }
 
   Future<List<Project>> _load() async {
+    await _ensureDefault();
     final rows =
         await (_db.select(_db.projects)
               ..where((t) => t.archivedAt.isNull())
               ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
             .get();
     final rules = await _db.select(_db.projectRules).get();
-    return [
+    final projects = [
       for (final row in rows)
         Project(
           id: row.id,
@@ -40,6 +93,11 @@ class ProjectRepository {
                 ProjectRuleItem(rule.kind, rule.pattern),
           ],
         ),
+    ];
+    // Last, so a project of your own always wins a match.
+    return [
+      ...projects.where((p) => !p.isDefault),
+      ...projects.where((p) => p.isDefault),
     ];
   }
 

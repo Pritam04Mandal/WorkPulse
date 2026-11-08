@@ -21,7 +21,7 @@ class ProjectFormScreen extends ConsumerStatefulWidget {
 
 class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
   final _name = TextEditingController();
-  final _repository = TextEditingController();
+  final _repositories = <TextEditingController>[];
   var _colorHex = projectColors.first.$2;
   var _matchFolder = true;
   var _saving = false;
@@ -34,25 +34,43 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
       if (project.id == widget.id) {
         _existing = project;
         _name.text = project.name;
-        _repository.text = project.repository ?? '';
         _colorHex = project.colorHex;
+        _repositories.addAll(
+          project.repositories.map((r) => TextEditingController(text: r)),
+        );
       }
     }
+    if (_repositories.isEmpty) _repositories.add(TextEditingController());
     _name.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _name.dispose();
-    _repository.dispose();
+    for (final controller in _repositories) {
+      controller.dispose();
+    }
     super.dispose();
   }
+
+  void _removeRepository(int index) => setState(() {
+    final removed = _repositories.removeAt(index);
+    // It may still be attached until the rebuild finishes.
+    WidgetsBinding.instance.addPostFrameCallback((_) => removed.dispose());
+    if (_repositories.isEmpty) _repositories.add(TextEditingController());
+  });
+
+  List<ProjectRuleItem> _repositoryRules() => [
+    for (final value in {
+      for (final controller in _repositories)
+        if (controller.text.trim().isNotEmpty) controller.text.trim(),
+    })
+      ProjectRuleItem(RuleKind.repo, value),
+  ];
 
   Future<void> _save() async {
     setState(() => _saving = true);
     final name = _name.text.trim();
-    final repositoryText = _repository.text.trim();
-    final repository = repositoryText.isEmpty ? null : repositoryText;
     final store = ref.read(projectRepositoryProvider);
     final existing = _existing;
     if (existing != null) {
@@ -61,8 +79,10 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
           id: existing.id,
           name: name,
           colorHex: _colorHex,
-          repository: repository,
-          rules: existing.rules,
+          rules: [
+            ...existing.rules.where((r) => r.kind != RuleKind.repo),
+            ..._repositoryRules(),
+          ],
         ),
       );
       if (mounted) context.pop();
@@ -74,8 +94,10 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
         id: id,
         name: name,
         colorHex: _colorHex,
-        repository: repository,
-        rules: [if (_matchFolder) ProjectRuleItem(RuleKind.path, name)],
+        rules: [
+          if (_matchFolder) ProjectRuleItem(RuleKind.path, name),
+          ..._repositoryRules(),
+        ],
       ),
     );
     if (mounted) context.pushReplacement('/projects/$id');
@@ -136,13 +158,48 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
           ],
         ),
         const SizedBox(height: 20),
-        const _Label('Repository (optional)'),
-        TextField(
-          controller: _repository,
-          decoration: const InputDecoration(hintText: 'github.com/owner/repo'),
+        const _Label('Repositories (optional)'),
+        for (final (index, controller) in _repositories.indexed)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    key: ObjectKey(controller),
+                    controller: controller,
+                    decoration: const InputDecoration(
+                      hintText: 'github.com/owner/repo',
+                    ),
+                  ),
+                ),
+                if (_repositories.length > 1)
+                  IconButton(
+                    tooltip: 'Remove repository',
+                    onPressed: () => _removeRepository(index),
+                    icon: const Icon(
+                      Icons.close,
+                      size: 18,
+                      color: AppColors.muted,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            style: TextButton.styleFrom(
+              minimumSize: const Size(0, 40),
+              foregroundColor: AppColors.accent,
+            ),
+            onPressed: () =>
+                setState(() => _repositories.add(TextEditingController())),
+            child: const Text('Add another repository'),
+          ),
         ),
         if (!editing && name.isNotEmpty) ...[
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           const _Label('Auto-assign activity that matches'),
           InkWell(
             onTap: () => setState(() => _matchFolder = !_matchFolder),

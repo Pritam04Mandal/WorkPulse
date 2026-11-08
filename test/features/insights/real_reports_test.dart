@@ -85,6 +85,28 @@ void main() {
       expect(normalizeRepository('my.org/app'), 'my.org/app');
     });
 
+    test('a project can link several repositories', () {
+      const project = Project(
+        id: 'p',
+        name: 'x',
+        colorHex: '#3DD6B0',
+        repository: 'github.com/me/app',
+        rules: [
+          ProjectRuleItem(RuleKind.repo, 'github.com/me/api'),
+          ProjectRuleItem(RuleKind.repo, 'gitlab.com/team/web'),
+        ],
+      );
+      expect(project.repositories, hasLength(3));
+      for (final name in ['me/app', 'me/api', 'team/web']) {
+        expect(
+          matchProject(commit('c', name), [project]),
+          project,
+          reason: name,
+        );
+      }
+      expect(matchProject(commit('c', 'me/other'), [project]), isNull);
+    });
+
     test('a path rule matches the folder of a coding session', () {
       final session = timed(
         'VS Code · mobile',
@@ -138,6 +160,104 @@ void main() {
     });
   });
 
+  group('default usage project', () {
+    const usage = Project(
+      id: usageProjectId,
+      name: usageProjectName,
+      colorHex: usageProjectColor,
+    );
+    TrackedActivity phoneApp(String package) =>
+        timed(package, application: package);
+
+    test('collects system apps', () {
+      for (final package in [
+        'com.android.settings',
+        'com.google.android.dialer',
+        'com.android.server.telecom',
+        'com.google.android.contacts',
+        'com.google.android.apps.messaging',
+        'com.oplus.camera',
+        'com.google.android.deskclock',
+      ]) {
+        expect(
+          matchProject(phoneApp(package), [usage]),
+          usage,
+          reason: package,
+        );
+      }
+    });
+
+    test('leaves ordinary apps alone', () {
+      for (final package in [
+        'com.android.chrome',
+        'com.whatsapp',
+        'com.google.android.youtube',
+      ]) {
+        expect(
+          matchProject(phoneApp(package), [usage]),
+          isNull,
+          reason: package,
+        );
+      }
+    });
+
+    test('a project of your own wins over it', () {
+      const mine = Project(
+        id: 'p',
+        name: 'Mine',
+        colorHex: '#3DD6B0',
+        rules: [ProjectRuleItem(RuleKind.app, 'com.android.settings')],
+      );
+      expect(
+        matchProject(phoneApp('com.android.settings'), [mine, usage]),
+        mine,
+      );
+    });
+
+    test('never takes coding sessions or private events', () {
+      final session = timed(
+        'VS Code · x',
+        kind: ActivityKind.codingSession,
+        application: 'com.android.settings',
+      );
+      expect(matchProject(session, [usage]), isNull);
+      final private = timed(
+        'Settings',
+        application: 'com.android.settings',
+        isPrivate: true,
+      );
+      expect(matchProject(private, [usage]), isNull);
+    });
+
+    test('watching projects settles instead of waking itself', () async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      var emissions = 0;
+      final subscription = ProjectRepository(database: db)
+          .watchAll()
+          .listen((_) => emissions++);
+      addTearDown(subscription.cancel);
+
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(emissions, lessThan(4));
+    });
+
+    test('exists, comes last and returns after a wipe', () async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final repo = ProjectRepository(database: db);
+      await repo.save(
+        const Project(id: 'a', name: 'Mine', colorHex: '#3DD6B0'),
+      );
+
+      final projects = await repo.watchAll().first;
+      expect(projects.map((p) => p.id), ['a', usageProjectId]);
+
+      await db.delete(db.projects).go();
+      expect((await repo.watchAll().first).single.id, usageProjectId);
+    });
+  });
+
   group('project repository', () {
     late AppDatabase db;
     late ProjectRepository repo;
@@ -156,7 +276,9 @@ void main() {
         rules: [ProjectRuleItem(RuleKind.path, 'app')],
       );
       await repo.save(project);
-      var loaded = await repo.watchAll().first;
+      List<Project> own(List<Project> all) =>
+          all.where((p) => !p.isDefault).toList();
+      var loaded = own(await repo.watchAll().first);
       expect(loaded.single.rules.single.kind, RuleKind.path);
 
       await repo.save(
@@ -164,12 +286,12 @@ void main() {
           rules: const [ProjectRuleItem(RuleKind.repo, 'me/app')],
         ),
       );
-      loaded = await repo.watchAll().first;
+      loaded = own(await repo.watchAll().first);
       expect(loaded, hasLength(1));
       expect(loaded.single.rules.single.value, 'me/app');
 
       await repo.delete('p1');
-      expect(await repo.watchAll().first, isEmpty);
+      expect(own(await repo.watchAll().first), isEmpty);
       expect(await db.select(db.projectRules).get(), isEmpty);
     });
   });

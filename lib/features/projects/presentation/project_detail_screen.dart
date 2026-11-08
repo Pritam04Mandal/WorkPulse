@@ -127,7 +127,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          project.repository ?? 'No repository',
+          project.isDefault
+              ? 'Settings, Phone, Messages and other system apps'
+              : project.repositories.isEmpty
+              ? 'No repository'
+              : project.repositories.join('\n'),
           style: AppText.mono(size: 13, color: AppColors.muted),
         ),
         const SizedBox(height: 20),
@@ -182,7 +186,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             ],
           ),
         ),
-        if (project.repository != null) ...[
+        if (project.repositories.isNotEmpty) ...[
           const SizedBox(height: 20),
           const SectionTitle('GitHub this week'),
           Row(
@@ -207,7 +211,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             ),
           ],
         ),
-        if (project.rules.isEmpty && !_adding)
+        if (project.rules.isEmpty && !_adding && !project.isDefault)
           const Text(
             'No rules yet. Add one so activity is assigned automatically.',
             style: AppText.caption,
@@ -275,14 +279,16 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           onPressed: () => context.go('/timeline'),
           child: const Text('View timeline'),
         ),
-        const SizedBox(height: 10),
-        TextButton(
-          style: TextButton.styleFrom(
-            foregroundColor: AppColors.destructiveText,
+        if (!project.isDefault) ...[
+          const SizedBox(height: 10),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.destructiveText,
+            ),
+            onPressed: () => _askDelete(project),
+            child: const Text('Delete project'),
           ),
-          onPressed: () => _askDelete(project),
-          child: const Text('Delete project'),
-        ),
+        ],
       ],
     );
   }

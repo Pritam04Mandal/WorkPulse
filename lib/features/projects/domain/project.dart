@@ -15,6 +15,11 @@ const projectColors = <(String, String)>[
 Color colorFromHex(String hex) =>
     Color(int.parse('FF${hex.substring(1)}', radix: 16));
 
+/// The built-in project that collects phone system apps.
+const usageProjectId = 'default-usage';
+const usageProjectName = 'Usage';
+const usageProjectColor = '#8B919A';
+
 class ProjectRuleItem {
   const ProjectRuleItem(this.kind, this.value);
 
@@ -46,6 +51,15 @@ class Project {
   final List<ProjectRuleItem> rules;
 
   Color get color => colorFromHex(colorHex);
+
+  /// Every linked GitHub or GitLab repository.
+  List<String> get repositories => {
+    ?repository,
+    for (final rule in rules)
+      if (rule.kind == RuleKind.repo) rule.value,
+  }.toList();
+
+  bool get isDefault => id == usageProjectId;
 
   Project copyWith({List<ProjectRuleItem>? rules}) => Project(
     id: id,

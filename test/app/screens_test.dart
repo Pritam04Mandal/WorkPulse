@@ -201,7 +201,7 @@ void main() {
 
   for (final (route, expected) in const [
     ('/home', 'Today'),
-    ('/projects', 'No projects yet'),
+    ('/projects', 'No projects of your own yet'),
     ('/insights', 'Nothing recorded for this period'),
     ('/projects/new', 'New project'),
     ('/home/journal', 'Nothing recorded yet'),
@@ -288,7 +288,35 @@ void main() {
     expect(find.text('Matching rules'), findsOneWidget);
     await tester.runAsync(() async {
       final rows = await db.select(db.projects).get();
-      expect(rows.single.name, 'mobile-release');
+      expect(rows.map((r) => r.name), contains('mobile-release'));
+    });
+    await finish(tester);
+  });
+
+  testWidgets('a project can be created with several repositories', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    container.read(routerProvider).go('/projects/new');
+    await settle(tester);
+
+    await tester.enterText(find.byType(TextField).at(0), 'platform');
+    await tester.enterText(find.byType(TextField).at(1), 'github.com/me/api');
+    await tester.pump();
+    await tester.tap(find.text('Add another repository'));
+    await tester.pump();
+    await tester.enterText(find.byType(TextField).at(2), 'gitlab.com/team/web');
+    await tester.pump();
+    await tester.tap(find.text('Create project'));
+    await settle(tester);
+    await settle(tester);
+
+    await tester.runAsync(() async {
+      final rules = await db.select(db.projectRules).get();
+      expect(
+        rules.where((r) => r.kind == RuleKind.repo).map((r) => r.pattern),
+        ['github.com/me/api', 'gitlab.com/team/web'],
+      );
     });
     await finish(tester);
   });
