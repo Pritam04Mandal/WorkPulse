@@ -6,11 +6,12 @@ with Flutter that keeps everything on the device and records metadata only.
 Design canvas: https://claude.ai/artifact/YNF37ooFtoH4Rq3DEYAMdm
 Build notes: [build-handoff.md](build-handoff.md)
 
-## Status: Phase 1
+## Status
 
-Done: onboarding, Google/Microsoft/local sign-in, the full local database, and
-a Home dashboard with labelled sample data. Timeline, Projects, Insights,
-Settings, Journal and Integrations are placeholders.
+Every design screen is built. Onboarding, sign-in, Profile, sign-out and
+Delete all data are real. Everything marked `SAMPLE DATA` uses in-memory
+examples until the integrations land: Android usage tracking first, then
+GitHub, Teams and the paired devices.
 
 The database tables other than `users` were derived from the design canvas,
 because the original spec's §6 was not available. See `lib/core/database/tables.dart`.

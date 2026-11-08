@@ -22,7 +22,7 @@ const _sampleProjects = [
     sources: 'GitHub · VS Code · Claude',
     badge: 'From repository',
     stats: ProjectStats(
-      dailyHours: [3.2, 4.4, 2.9, 4.1, 3.0, 0.2, 0.5],
+      dailyHours: [3.2, 4.4, 2.9, 4.1, 3.0, 0.233, 0.5],
       breakdown: [
         ('Coding', Duration(minutes: 890)),
         ('AI', Duration(minutes: 155)),
