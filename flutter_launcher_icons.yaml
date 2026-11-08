@@ -1,0 +1,22 @@
+# WorkPulse launcher icon. Run from the Flutter project root:
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true                  # overwrite the default ic_launcher (removes the Flutter icon)
+  ios: false
+  web:
+    generate: false
+  windows:
+    generate: false
+  macos:
+    generate: false
+  min_sdk_android: 21
+
+  # Legacy (pre-Android 8) square icon, full bleed
+  image_path: "assets/icon/icon.png"
+
+  # Android 8+ adaptive icon
+  adaptive_icon_background: "#0E0F11"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+  adaptive_icon_foreground_inset: 0   # the safe-zone padding is already baked into the PNG
+  # Android 13+ themed (Material You) icon
+  adaptive_icon_monochrome: "assets/icon/icon_monochrome.png"

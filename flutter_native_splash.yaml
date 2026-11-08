@@ -1,0 +1,21 @@
+# WorkPulse native splash. Run from the Flutter project root:
+#   dart run flutter_native_splash:create
+# To return to Flutter's default: dart run flutter_native_splash:remove
+flutter_native_splash:
+  # Android 11 and older
+  color: "#0E0F11"
+  image: assets/splash/splash_logo.png          # 4x asset → 160dp wide
+  branding: assets/splash/splash_branding.png   # 4x asset → 200x80dp
+  branding_mode: bottom
+  branding_bottom_padding: 24
+
+  # Android 12+ (system SplashScreen API: centred icon + optional branding)
+  android_12:
+    color: "#0E0F11"
+    image: assets/splash/splash_android12.png    # 1152x1152, mark inside the 768px circle
+    branding: assets/splash/splash_branding.png
+
+  android: true
+  ios: false
+  web: false
+  fullscreen: false

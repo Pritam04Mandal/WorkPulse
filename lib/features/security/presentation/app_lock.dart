@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/setting_keys.dart';
 import '../../../core/theme/tokens.dart';
-import '../../../core/widgets/app_widgets.dart';
+import '../../../core/widgets/wp_logo_mark.dart';
 import '../../auth/presentation/session_controller.dart';
 import '../data/biometric_gateway.dart';
 
@@ -175,7 +175,7 @@ class _LockScreenState extends ConsumerState<LockScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Center(child: PulseMark(size: 48)),
+              const Center(child: WpLogoMark(size: 56)),
               const SizedBox(height: 20),
               Text(
                 'WorkPulse is locked',

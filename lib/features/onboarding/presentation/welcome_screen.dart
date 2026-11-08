@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/tokens.dart';
-import '../../../core/widgets/app_widgets.dart';
+import '../../../core/widgets/wp_logo_mark.dart';
 import '../../auth/presentation/session_controller.dart';
 
 class WelcomeScreen extends ConsumerWidget {
@@ -41,7 +41,7 @@ class WelcomeScreen extends ConsumerWidget {
                           border: Border.all(color: AppColors.borderStrong),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const PulseMark(),
+                        child: const WpLogoMark(size: 28),
                       ),
                     ),
                     const SizedBox(height: 20),
