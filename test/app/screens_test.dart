@@ -321,6 +321,94 @@ void main() {
     await finish(tester);
   });
 
+  group('GitHub repositories', () {
+    Future<TrackedRepository> seed(WidgetTester tester) async {
+      late TrackedRepository app;
+      await tester.runAsync(() async {
+        final source = await db
+            .into(db.dataSources)
+            .insertReturning(
+              DataSourcesCompanion.insert(
+                kind: SourceKind.github,
+                status: SourceStatus.connected,
+                accountLabel: const Value('me'),
+                connectedAt: DateTime(2026),
+              ),
+            );
+        app = await db
+            .into(db.trackedRepositories)
+            .insertReturning(
+              TrackedRepositoriesCompanion.insert(
+                sourceId: source.id,
+                fullName: 'me/alpha-app',
+              ),
+            );
+        await db
+            .into(db.trackedRepositories)
+            .insert(
+              TrackedRepositoriesCompanion.insert(
+                sourceId: source.id,
+                fullName: 'me/billing',
+              ),
+            );
+        await db
+            .into(db.activityEvents)
+            .insert(
+              ActivityEventsCompanion.insert(
+                sourceId: source.id,
+                kind: ActivityKind.commit,
+                category: ActivityCategory.coding,
+                title: 'Commit · Fix login',
+                domain: const Value('me/alpha-app'),
+                startedAt: DateTime(2026, 11, 8, 10),
+              ),
+            );
+      });
+      return app;
+    }
+
+    testWidgets('the list can be searched', (tester) async {
+      await pumpApp(tester);
+      await seed(tester);
+      container.read(routerProvider).go('/integrations/github');
+      await settle(tester);
+      await settle(tester);
+
+      expect(find.text('me/alpha-app'), findsOneWidget);
+      expect(find.text('me/billing'), findsOneWidget);
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Search repositories'),
+        'BILL',
+      );
+      await tester.pump();
+      expect(find.text('me/alpha-app'), findsNothing);
+      expect(find.text('me/billing'), findsOneWidget);
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Search repositories'),
+        'zzz',
+      );
+      await tester.pump();
+      expect(find.text('No repositories match “zzz”.'), findsOneWidget);
+      await finish(tester);
+    });
+
+    testWidgets('the detail view shows recorded activity', (tester) async {
+      await pumpApp(tester);
+      final app = await seed(tester);
+      container.read(routerProvider).go('/integrations/github/repo/${app.id}');
+      await settle(tester);
+      await settle(tester);
+
+      expect(find.text('me/alpha-app'), findsOneWidget);
+      expect(find.text('Commit · Fix login'), findsOneWidget);
+      expect(find.text('Open on GitHub'), findsOneWidget);
+      expect(find.text('Not linked to a project.'), findsOneWidget);
+      await finish(tester);
+    });
+  });
+
   testWidgets('delete requires typing DELETE and wipes the database', (
     tester,
   ) async {

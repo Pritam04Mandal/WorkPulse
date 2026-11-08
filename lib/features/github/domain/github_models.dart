@@ -1,4 +1,5 @@
 import '../../../core/domain/enums.dart';
+import '../../tracking/domain/usage_models.dart';
 
 class DeviceCode {
   const DeviceCode({
@@ -83,6 +84,47 @@ class PushedRepositories {
 
   final String? etag;
   final List<PushedRepository> repositories;
+}
+
+/// What's been recorded for one repository.
+class RepositoryStats {
+  const RepositoryStats({
+    required this.commits,
+    required this.pullRequests,
+    required this.reviews,
+    required this.issues,
+    required this.codingTime,
+    this.lastActivity,
+  });
+
+  /// Private events never count.
+  factory RepositoryStats.from(Iterable<TrackedActivity> activities) {
+    final visible = activities.where((a) => !a.isPrivate).toList();
+    int count(ActivityKind kind) => visible.where((a) => a.kind == kind).length;
+    DateTime? latest;
+    var coding = Duration.zero;
+    for (final activity in visible) {
+      if (latest == null || activity.start.isAfter(latest)) {
+        latest = activity.start;
+      }
+      coding += activity.duration ?? Duration.zero;
+    }
+    return RepositoryStats(
+      commits: count(ActivityKind.commit),
+      pullRequests: count(ActivityKind.pullRequest),
+      reviews: count(ActivityKind.review),
+      issues: count(ActivityKind.issue),
+      codingTime: coding,
+      lastActivity: latest,
+    );
+  }
+
+  final int commits;
+  final int pullRequests;
+  final int reviews;
+  final int issues;
+  final Duration codingTime;
+  final DateTime? lastActivity;
 }
 
 class RateBudget {

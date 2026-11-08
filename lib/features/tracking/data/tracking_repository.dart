@@ -121,6 +121,14 @@ class TrackingRepository {
     return query.watch().map((rows) => rows.map(_toActivity).toList());
   }
 
+  /// Everything recorded for one repository, newest first.
+  Stream<List<TrackedActivity>> watchRepository(String fullName) {
+    final query = _db.select(_db.activityEvents)
+      ..where((t) => t.domain.equals(fullName))
+      ..orderBy([(t) => OrderingTerm.desc(t.startedAt)]);
+    return query.watch().map((rows) => rows.map(_toActivity).toList());
+  }
+
   Stream<TrackedActivity?> watchActivity(String id) =>
       (_db.select(_db.activityEvents)..where((t) => t.id.equals(id)))
           .watchSingleOrNull()

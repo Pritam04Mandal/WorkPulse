@@ -252,7 +252,7 @@ class _GitHubConnectScreenState extends ConsumerState<GitHubConnectScreen> {
         style: AppText.caption,
       ),
       const SizedBox(height: 4),
-      const GitHubRepositoryList(),
+      const GitHubRepositoryList(confirmIgnore: false),
     ];
   }
 }

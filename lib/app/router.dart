@@ -8,6 +8,7 @@ import '../features/dashboard/presentation/dashboard_screen.dart';
 import '../features/insights/presentation/insights_screen.dart';
 import '../features/integrations/presentation/claude_code_screen.dart';
 import '../features/integrations/presentation/github_connect_screen.dart';
+import '../features/integrations/presentation/github_repository_screen.dart';
 import '../features/integrations/presentation/integrations_screen.dart';
 import '../features/integrations/presentation/source_detail_screen.dart';
 import '../features/journal/presentation/journal_screen.dart';
@@ -108,6 +109,11 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'connect',
                 builder: (context, state) => const GitHubConnectScreen(),
+              ),
+              GoRoute(
+                path: 'repo/:id',
+                builder: (context, state) =>
+                    GitHubRepositoryScreen(id: state.pathParameters['id']!),
               ),
             ],
           ),

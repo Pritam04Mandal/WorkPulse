@@ -27,6 +27,12 @@ final rangeActivitiesProvider = StreamProvider.autoDispose
           ref.watch(trackingRepositoryProvider).watchRange(range.$1, range.$2),
     );
 
+final repositoryActivityProvider = StreamProvider.autoDispose
+    .family<List<TrackedActivity>, String>(
+      (ref, fullName) =>
+          ref.watch(trackingRepositoryProvider).watchRepository(fullName),
+    );
+
 final activityProvider = StreamProvider.autoDispose
     .family<TrackedActivity?, String>(
       (ref, id) => ref.watch(trackingRepositoryProvider).watchActivity(id),

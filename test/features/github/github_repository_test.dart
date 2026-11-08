@@ -8,6 +8,7 @@ import 'package:workpulse/features/github/data/github_api.dart';
 import 'package:workpulse/features/github/data/github_repository.dart';
 import 'package:workpulse/features/github/data/github_token_store.dart';
 import 'package:workpulse/features/github/domain/github_models.dart';
+import 'package:workpulse/features/tracking/domain/usage_models.dart';
 
 class FakeClient implements GitHubClient {
   List<GitHubActivity> activity = [];
@@ -388,6 +389,44 @@ void main() {
       await expectLater(repo.pollForPushes(), throwsA(isA<GitHubFailure>()));
       expect((await repo.watchStatus().first)?.needsReconnect, isTrue);
     });
+  });
+
+  test('repository stats count activity and leave out private events', () {
+    final at = DateTime(2026, 11, 9, 10);
+    TrackedActivity item(
+      ActivityKind kind, {
+      DateTime? end,
+      bool isPrivate = false,
+    }) => TrackedActivity(
+      id: '$kind',
+      kind: kind,
+      category: ActivityCategory.coding,
+      title: 't',
+      start: at,
+      end: end,
+      isPrivate: isPrivate,
+    );
+
+    final stats = RepositoryStats.from([
+      item(ActivityKind.commit),
+      item(ActivityKind.commit),
+      item(ActivityKind.pullRequest),
+      item(ActivityKind.review),
+      item(ActivityKind.issue),
+      item(
+        ActivityKind.codingSession,
+        end: at.add(const Duration(minutes: 30)),
+      ),
+      item(ActivityKind.commit, isPrivate: true),
+    ]);
+
+    expect(stats.commits, 2);
+    expect(stats.pullRequests, 1);
+    expect(stats.reviews, 1);
+    expect(stats.issues, 1);
+    expect(stats.codingTime, const Duration(minutes: 30));
+    expect(stats.lastActivity, at);
+    expect(RepositoryStats.from(const []).lastActivity, isNull);
   });
 
   test('reconnecting reuses the same source', () async {
