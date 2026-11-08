@@ -7,6 +7,7 @@ import 'package:workpulse/app/router.dart';
 import 'package:workpulse/core/database/app_database.dart';
 import 'package:workpulse/core/domain/enums.dart';
 import 'package:workpulse/core/format/durations.dart';
+import 'package:workpulse/core/theme/tokens.dart';
 import 'package:workpulse/features/auth/data/auth_repository_impl.dart';
 import 'package:workpulse/features/auth/domain/auth_contracts.dart';
 import 'package:workpulse/features/auth/domain/auth_models.dart';
@@ -139,6 +140,10 @@ void main() {
       expect(find.text('5h 42m'), findsOneWidget);
       expect(find.byType(NavigationBar), findsOneWidget);
       expect(find.text('Settings'), findsOneWidget);
+      final codingBar = find.byWidgetPredicate(
+        (w) => w is ColoredBox && w.color == AppColors.coding,
+      );
+      expect(tester.getSize(codingBar).height, 8);
 
       await tester.runAsync(() async {
         final users = await db.select(db.users).get();

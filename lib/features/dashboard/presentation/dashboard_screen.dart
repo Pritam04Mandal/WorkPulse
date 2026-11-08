@@ -262,6 +262,7 @@ class _ActiveTrackingCard extends StatelessWidget {
           child: SizedBox(
             height: 8,
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               spacing: 2,
               children: [
                 for (final c in summary.categories)

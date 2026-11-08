@@ -58,10 +58,14 @@ abstract final class AppTheme {
           fontWeight: FontWeight.w700,
           letterSpacing: -0.22,
         ),
-        titleMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-        bodyLarge: TextStyle(fontSize: 15, height: 1.5),
-        bodyMedium: TextStyle(fontSize: 14, height: 1.5),
-        bodySmall: TextStyle(fontSize: 13, height: 1.5),
+        titleMedium: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0,
+        ),
+        bodyLarge: TextStyle(fontSize: 15, height: 1.5, letterSpacing: 0),
+        bodyMedium: TextStyle(fontSize: 14, height: 1.5, letterSpacing: 0),
+        bodySmall: TextStyle(fontSize: 13, height: 1.5, letterSpacing: 0),
       ).apply(bodyColor: AppColors.text, displayColor: AppColors.text),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
