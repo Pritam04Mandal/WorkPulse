@@ -67,6 +67,58 @@ abstract final class AppTheme {
         bodyMedium: TextStyle(fontSize: 14, height: 1.5, letterSpacing: 0),
         bodySmall: TextStyle(fontSize: 13, height: 1.5, letterSpacing: 0),
       ).apply(bodyColor: AppColors.text, displayColor: AppColors.text),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: AppColors.background,
+        foregroundColor: AppColors.text,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        titleSpacing: 0,
+        titleTextStyle: TextStyle(
+          fontFamily: AppFonts.sans,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          color: AppColors.text,
+        ),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? AppColors.onAccent
+              : AppColors.muted,
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? AppColors.accent
+              : AppColors.borderStrong,
+        ),
+        trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.surface,
+        hintStyle: const TextStyle(color: AppColors.muted),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.borderStrong),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.accent),
+        ),
+      ),
+      snackBarTheme: const SnackBarThemeData(
+        backgroundColor: AppColors.borderStrong,
+        contentTextStyle: TextStyle(
+          fontFamily: AppFonts.sans,
+          fontSize: 13,
+          color: AppColors.text,
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: buttonSize,
