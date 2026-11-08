@@ -48,7 +48,7 @@ class InsightsData {
   final List<(String, Duration)> topApps;
 
   Duration _total(List<double> hours) => Duration(
-    minutes: (hours.fold<double>(0, (sum, h) => sum + h) * 60).round(),
+    seconds: (hours.fold<double>(0, (sum, h) => sum + h) * 3600).round(),
   );
 
   Duration get usageTotal => _total(usage);

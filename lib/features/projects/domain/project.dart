@@ -114,6 +114,6 @@ class ProjectStats {
   final String sources;
 
   Duration get week => Duration(
-    minutes: (dailyHours.fold<double>(0, (sum, h) => sum + h) * 60).round(),
+    seconds: (dailyHours.fold<double>(0, (sum, h) => sum + h) * 3600).round(),
   );
 }

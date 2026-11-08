@@ -106,6 +106,32 @@ void main() {
       expect(matchProject(event, [rule(RuleKind.title, 'term')]), isNotNull);
     });
 
+    test('an app rule accepts the name people see', () {
+      final event = timed('Chrome', application: 'com.android.chrome');
+      expect(matchProject(event, [rule(RuleKind.app, 'Chrome')]), isNotNull);
+      expect(
+        matchProject(event, [rule(RuleKind.app, 'com.android.chrome')]),
+        isNotNull,
+      );
+      expect(matchProject(event, [rule(RuleKind.app, 'Firefox')]), isNull);
+    });
+
+    test('a few seconds of use is not rounded away', () {
+      final event = timed('Chrome', minutes: 0);
+      final short = TrackedActivity(
+        id: 'a',
+        kind: event.kind,
+        category: event.category,
+        title: 'Chrome',
+        start: event.start,
+        end: event.start.add(const Duration(seconds: 16)),
+      );
+      expect(
+        ProjectStats.from([short], monday).week,
+        const Duration(seconds: 16),
+      );
+    });
+
     test('private events belong to no project', () {
       final event = timed('Termux', isPrivate: true, application: 'com.termux');
       expect(matchProject(event, [rule(RuleKind.app, 'com.termux')]), isNull);

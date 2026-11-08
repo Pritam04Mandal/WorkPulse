@@ -39,7 +39,10 @@ bool _matchesRule(ProjectRuleItem rule, TrackedActivity activity) {
   return switch (rule.kind) {
     RuleKind.repo =>
       activity.repository?.toLowerCase() == normalizeRepository(rule.value),
-    RuleKind.app => activity.application?.toLowerCase() == value,
+    // People type the name they see, like Chrome, not com.android.chrome.
+    RuleKind.app =>
+      activity.application?.toLowerCase() == value ||
+          activity.title.toLowerCase() == value,
     RuleKind.title => activity.title.toLowerCase().contains(value),
     RuleKind.path => _folderOf(activity) == _lastPathPart(rule.value),
     // Needs the browser extension, which doesn't exist yet.
