@@ -39,27 +39,20 @@ To change the schema: edit `tables.dart`, bump `schemaVersion`, run
 `dart run drift_dev make-migrations`, and wire the generated steps into
 `AppDatabase.migration`.
 
-## Sign-in configuration
+## Credentials
 
-Without these the Google and Microsoft buttons show a "not configured" state.
-Never commit real values. `dart_defines*.json` is git-ignored.
+All client IDs and signature hashes live in `.env` at the project root, which
+is git-ignored. Anything left empty shows as "not configured" in the app.
 
-```json
-{
-  "GOOGLE_SERVER_CLIENT_ID": "<web client id>.apps.googleusercontent.com",
-  "MSAL_CLIENT_ID": "<azure application id>",
-  "MSAL_REDIRECT_URI": "msauth://com.workpulse.app/<url-encoded signature hash>"
-}
-```
+| Key | Where it comes from |
+| --- | --- |
+| `GITHUB_CLIENT_ID` | GitHub OAuth App with Device Flow enabled |
+| `GOOGLE_SERVER_CLIENT_ID` | Google Cloud, Web OAuth client |
+| `MSAL_CLIENT_ID` | Azure App registration |
+| `MSAL_REDIRECT_URI` | `msauth://com.workpulse.app/<url-encoded signature hash>` |
+| `MSAL_SIGNATURE_HASH_DEBUG` | Base64 hash of the debug signing key |
+| `MSAL_SIGNATURE_HASH_RELEASE` | Base64 hash of the release signing key |
 
 ```sh
-flutter run --dart-define-from-file=dart_defines.json
-```
-
-Microsoft also needs the signature hash for its redirect activity, in
-`~/.gradle/gradle.properties`:
-
-```properties
-workpulse.msalSignatureHash.debug=<base64 hash>
-workpulse.msalSignatureHash.release=<base64 hash>
+flutter run --dart-define-from-file=.env
 ```

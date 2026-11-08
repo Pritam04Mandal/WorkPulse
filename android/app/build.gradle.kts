@@ -4,10 +4,16 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// MSAL signature hashes are per signing key and come from Gradle properties
-// (~/.gradle/gradle.properties), never from the repo.
+// MSAL signature hashes are per signing key and come from the git-ignored .env.
+val localEnv: Map<String, String> =
+    rootProject.file("../.env").takeIf { it.exists() }?.readLines().orEmpty()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() && !it.startsWith("#") && "=" in it }
+        .associate { it.substringBefore("=").trim() to it.substringAfter("=").trim() }
+
 fun msalHash(buildType: String): String =
-    (project.findProperty("workpulse.msalSignatureHash.$buildType") as String?) ?: "not-configured"
+    localEnv["MSAL_SIGNATURE_HASH_${buildType.uppercase()}"]?.takeIf { it.isNotEmpty() }
+        ?: "not-configured"
 
 android {
     namespace = "com.workpulse.app"
