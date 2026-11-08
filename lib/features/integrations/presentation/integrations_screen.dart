@@ -1,0 +1,141 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/detail_widgets.dart';
+
+const _items = [
+  (
+    mono: 'A',
+    name: 'Android app usage',
+    detail: 'Usage Access · read 6m ago',
+    status: 'Active',
+    color: AppColors.accent,
+    route: '/usage-access',
+  ),
+  (
+    mono: 'GH',
+    name: 'GitHub',
+    detail: 'Synced 4m ago · 6 repositories',
+    status: 'Connected',
+    color: AppColors.accent,
+    route: '/integrations/github',
+  ),
+  (
+    mono: 'T',
+    name: 'Microsoft Teams',
+    detail: 'Calendar and meeting metadata',
+    status: 'Connected',
+    color: AppColors.accent,
+    route: '/integrations/teams',
+  ),
+  (
+    mono: 'BX',
+    name: 'Browser extension',
+    detail: 'Chrome · ChatGPT, Claude, domains',
+    status: 'Connected',
+    color: AppColors.accent,
+    route: '/integrations/pair',
+  ),
+  (
+    mono: 'DC',
+    name: 'Desktop companion',
+    detail: 'VS Code, Zed, git · 1 device',
+    status: 'Connected',
+    color: AppColors.accent,
+    route: '/integrations/pair?device=desktop',
+  ),
+  (
+    mono: 'GL',
+    name: 'GitLab or GitHub Enterprise',
+    detail: 'Add a company or self-hosted instance',
+    status: 'Add',
+    color: AppColors.coding,
+    route: '/integrations/add-git',
+  ),
+  (
+    mono: 'AI',
+    name: 'Local AI summaries',
+    detail: 'Ollama on your network',
+    status: 'Planned',
+    color: AppColors.muted,
+    route: null,
+  ),
+];
+
+class IntegrationsScreen extends StatelessWidget {
+  const IntegrationsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => DetailPage(
+    title: 'Integrations',
+    sample: true,
+    children: [
+      Text(
+        'Each source is connected and removed on its own. Disconnecting asks '
+        'whether to keep or delete its events.',
+        style: AppText.caption.copyWith(fontSize: 13),
+      ),
+      const SizedBox(height: 8),
+      for (final item in _items)
+        InkWell(
+          onTap: item.route == null ? null : () => context.push(item.route!),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 64),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.divider)),
+            ),
+            child: Row(
+              spacing: 12,
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.borderStrong),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(item.mono, style: AppText.mono()),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        item.name,
+                        style: Theme.of(context).textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w500),
+                      ),
+                      Text(item.detail, style: AppText.caption),
+                    ],
+                  ),
+                ),
+                Row(
+                  spacing: 6,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: item.color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    Text(item.status, style: AppText.caption),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      const SizedBox(height: 16),
+      const Text(
+        'Signing in with Microsoft does not grant Teams access. Teams asks '
+        'for its own calendar permission. Chat messages are never read.',
+        style: AppText.caption,
+      ),
+    ],
+  );
+}
