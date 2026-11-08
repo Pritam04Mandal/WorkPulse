@@ -71,6 +71,20 @@ class GitHubActivity {
   final DateTime occurredAt;
 }
 
+class PushedRepository {
+  const PushedRepository(this.fullName, this.pushedAt);
+
+  final String fullName;
+  final DateTime pushedAt;
+}
+
+class PushedRepositories {
+  const PushedRepositories(this.etag, this.repositories);
+
+  final String? etag;
+  final List<PushedRepository> repositories;
+}
+
 class RateBudget {
   const RateBudget(this.remaining, this.limit);
 

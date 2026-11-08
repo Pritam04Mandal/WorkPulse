@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
@@ -10,6 +12,7 @@ import '../data/github_token_store.dart';
 import '../domain/github_models.dart';
 
 const _autoSyncEvery = Duration(minutes: 15);
+const _livePollEvery = Duration(seconds: 60);
 
 final githubClientProvider = Provider<GitHubClient>((ref) {
   final http_ = http.Client();
@@ -42,8 +45,38 @@ final githubSyncProvider = NotifierProvider<GitHubSync, bool>(GitHubSync.new);
 
 /// State is whether a sync is running.
 class GitHubSync extends Notifier<bool> {
+  Timer? _liveTimer;
+  var _polling = false;
+
   @override
-  bool build() => false;
+  bool build() {
+    ref.onDispose(stopLive);
+    return false;
+  }
+
+  /// Checks for new pushes every minute until [stopLive].
+  void startLive() {
+    _liveTimer ??= Timer.periodic(_livePollEvery, (_) => _tick());
+  }
+
+  void stopLive() {
+    _liveTimer?.cancel();
+    _liveTimer = null;
+  }
+
+  Future<void> _tick() async {
+    if (_polling || state) return;
+    if (!ref.read(sessionProvider).onboardingComplete) return;
+    _polling = true;
+    try {
+      await refresh();
+      await ref.read(githubRepositoryProvider).pollForPushes();
+    } on GitHubFailure {
+      // Next tick tries again.
+    } finally {
+      _polling = false;
+    }
+  }
 
   /// Syncs if connected. Without [force], at most every 15 minutes and
   /// quietly: a failure just waits for the next attempt.

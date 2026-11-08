@@ -16,6 +16,8 @@ class WorkPulseApp extends ConsumerStatefulWidget {
 class _WorkPulseAppState extends ConsumerState<WorkPulseApp> {
   late final AppLifecycleListener _lifecycle;
 
+  GitHubSync get _github => ref.read(githubSyncProvider.notifier);
+
   void _catchUp() {
     ref.read(trackingControllerProvider.notifier).refresh();
     ref.read(githubSyncProvider.notifier).refresh();
@@ -24,8 +26,17 @@ class _WorkPulseAppState extends ConsumerState<WorkPulseApp> {
   @override
   void initState() {
     super.initState();
-    _lifecycle = AppLifecycleListener(onResume: _catchUp);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _catchUp());
+    _lifecycle = AppLifecycleListener(
+      onResume: () {
+        _catchUp();
+        _github.startLive();
+      },
+      onHide: () => _github.stopLive(),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _catchUp();
+      _github.startLive();
+    });
   }
 
   @override

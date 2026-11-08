@@ -47,6 +47,21 @@ abstract interface class GitHubClient {
     required DateTime until,
   });
   Future<RateBudget> fetchRateBudget(String token);
+
+  /// The most recently pushed repositories, or null if nothing changed since
+  /// [etag]. An unchanged answer doesn't count against the rate limit.
+  Future<PushedRepositories?> fetchPushedRepositories(
+    String token, {
+    String? etag,
+  });
+
+  /// The user's commits pushed to [repository] since [since], on any branch.
+  Future<List<GitHubActivity>> fetchRecentCommits(
+    String token, {
+    required String repository,
+    required String login,
+    required DateTime since,
+  });
 }
 
 /// Talks to github.com. Reads only: nothing here can write to GitHub.
@@ -57,6 +72,7 @@ class GitHubApi implements GitHubClient {
   final String _clientId;
 
   static final _commitSearchPages = [1, 2, 3];
+  static const _maxBranches = 5;
 
   Map<String, String> _headers(String token) => {
     'Accept': 'application/vnd.github+json',
@@ -296,6 +312,115 @@ class GitHubApi implements GitHubClient {
             occurredAt: time(node),
           ),
     ];
+  }
+
+  @override
+  Future<PushedRepositories?> fetchPushedRepositories(
+    String token, {
+    String? etag,
+  }) async {
+    final response = await _send(
+      () => _http.get(
+        Uri.https('api.github.com', '/user/repos', {
+          'per_page': '30',
+          'sort': 'pushed',
+        }),
+        headers: {..._headers(token), 'If-None-Match': ?etag},
+      ),
+    );
+    if (response.statusCode == 304) return null;
+    return PushedRepositories(response.headers['etag'], [
+      for (final raw in _decode(response)! as List<Object?>)
+        if ((raw! as Map<String, Object?>)['pushed_at']
+            case final String pushedAt)
+          PushedRepository(
+            (raw as Map<String, Object?>)['full_name']! as String,
+            DateTime.parse(pushedAt).toLocal(),
+          ),
+    ]);
+  }
+
+  @override
+  Future<List<GitHubActivity>> fetchRecentCommits(
+    String token, {
+    required String repository,
+    required String login,
+    required DateTime since,
+  }) async {
+    final commits = <String, GitHubActivity>{};
+    for (final branch in await _pushedBranches(
+      token,
+      repository,
+      login,
+      since,
+    )) {
+      final response = await _send(
+        () => _http.get(
+          Uri.https('api.github.com', '/repos/$repository/commits', {
+            'author': login,
+            'since': since.toUtc().toIso8601String(),
+            'per_page': '100',
+            'sha': ?branch,
+          }),
+          headers: _headers(token),
+        ),
+      );
+      for (final raw in _decode(response)! as List<Object?>) {
+        final item = raw! as Map<String, Object?>;
+        final commit = item['commit']! as Map<String, Object?>;
+        final author = commit['author']! as Map<String, Object?>;
+        final sha = item['sha']! as String;
+        commits[sha] = GitHubActivity(
+          externalId: 'commit:$sha',
+          kind: ActivityKind.commit,
+          title: 'Commit · ${(commit['message']! as String).split('\n').first}',
+          repository: repository,
+          occurredAt: DateTime.parse(author['date']! as String).toLocal(),
+        );
+      }
+    }
+    return commits.values.toList();
+  }
+
+  /// Branches the user just pushed to. A null entry means the default branch,
+  /// used when GitHub won't share the repository's activity.
+  Future<List<String?>> _pushedBranches(
+    String token,
+    String repository,
+    String login,
+    DateTime since,
+  ) async {
+    const prefix = 'refs/heads/';
+    try {
+      final response = await _send(
+        () => _http.get(
+          Uri.https('api.github.com', '/repos/$repository/activity', {
+            'actor': login,
+            'activity_type': 'push',
+            'time_period': 'day',
+            'per_page': '30',
+          }),
+          headers: _headers(token),
+        ),
+      );
+      final branches = <String>{
+        for (final raw in _decode(response)! as List<Object?>)
+          if (raw! as Map<String, Object?>
+              case {
+                'ref': final String ref,
+                'timestamp': final String timestamp,
+              }
+              when ref.startsWith(prefix) &&
+                  !DateTime.parse(timestamp).isBefore(since))
+            ref.substring(prefix.length),
+      };
+      return branches.isEmpty
+          ? const [null]
+          : branches.take(_maxBranches).toList();
+    } on GitHubFailure catch (failure) {
+      if (failure.kind == GitHubFailureKind.revoked) rethrow;
+      return const [null];
+    }
   }
 
   @override

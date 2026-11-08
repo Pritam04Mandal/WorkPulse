@@ -199,6 +199,99 @@ void main() {
     expect(activity[3].repository, 'me/app');
   });
 
+  test('an unchanged repository list returns null', () async {
+    late http.Request sent;
+    final result = await api((request) {
+      sent = request;
+      return http.Response('', 304);
+    }).fetchPushedRepositories('t', etag: 'abc');
+
+    expect(result, isNull);
+    expect(sent.headers['If-None-Match'], 'abc');
+  });
+
+  test('reads pushed repositories and skips ones never pushed', () async {
+    final result = await api(
+      (_) => http.Response(
+        jsonEncode([
+          {'full_name': 'me/app', 'pushed_at': '2026-11-08T10:00:00Z'},
+          {'full_name': 'me/empty', 'pushed_at': null},
+        ]),
+        200,
+        headers: {'etag': 'W/"x"'},
+      ),
+    ).fetchPushedRepositories('t');
+
+    expect(result?.etag, 'W/"x"');
+    expect(result?.repositories.single.fullName, 'me/app');
+  });
+
+  group('recent commits', () {
+    Map<String, Object> commitJson(String sha) => {
+      'sha': sha,
+      'commit': {
+        'message': 'Change $sha\n\nBody',
+        'author': {'date': '2026-11-08T10:00:00Z'},
+      },
+    };
+    final since = DateTime.utc(2026, 11, 8);
+
+    test('reads each pushed branch and removes duplicates', () async {
+      final branches = <String?>[];
+      final commits =
+          await api((request) {
+            if (request.url.path.endsWith('/activity')) {
+              return json([
+                {'ref': 'refs/heads/main', 'timestamp': '2026-11-08T10:00:00Z'},
+                {
+                  'ref': 'refs/heads/feat/x',
+                  'timestamp': '2026-11-08T11:00:00Z',
+                },
+                {'ref': 'refs/heads/old', 'timestamp': '2026-11-01T10:00:00Z'},
+                {'ref': 'refs/tags/v1', 'timestamp': '2026-11-08T11:00:00Z'},
+              ]);
+            }
+            branches.add(request.url.queryParameters['sha']);
+            return json([commitJson('shared')]);
+          }).fetchRecentCommits(
+            't',
+            repository: 'me/app',
+            login: 'me',
+            since: since,
+          );
+
+      expect(branches, ['main', 'feat/x']);
+      expect(commits.single.title, 'Commit · Change shared');
+    });
+
+    test('falls back to the default branch without activity access', () async {
+      final branches = <String?>[];
+      await api((request) {
+        if (request.url.path.endsWith('/activity')) return json({}, 403);
+        branches.add(request.url.queryParameters['sha']);
+        return json([commitJson('a')]);
+      }).fetchRecentCommits(
+        't',
+        repository: 'me/app',
+        login: 'me',
+        since: since,
+      );
+      expect(branches, [null]);
+    });
+
+    test('a rejected token is not hidden by the fallback', () async {
+      await expectLater(
+        api((_) => json({}, 401)).fetchRecentCommits(
+          't',
+          repository: 'me/app',
+          login: 'me',
+          since: since,
+        ),
+        failsWith(GitHubFailureKind.revoked),
+      );
+    });
+  });
+
   test('a GraphQL error response is a failure, not an empty result', () async {
     await expectLater(
       api((request) {

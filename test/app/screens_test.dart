@@ -95,6 +95,12 @@ class _MemoryGitHubTokens implements GitHubTokenStore {
 class _IdleGitHub extends GitHubSync {
   @override
   Future<void> refresh({bool force = false}) async {}
+
+  @override
+  void startLive() {}
+
+  @override
+  void stopLive() {}
 }
 
 void main() {

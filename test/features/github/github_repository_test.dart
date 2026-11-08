@@ -30,6 +30,32 @@ class FakeClient implements GitHubClient {
   @override
   Future<String> fetchLogin(String token) async => 'me';
 
+  PushedRepositories? pushed;
+  String? seenEtag;
+  final polledRepositories = <String>[];
+  Map<String, List<GitHubActivity>> recent = {};
+
+  @override
+  Future<PushedRepositories?> fetchPushedRepositories(
+    String token, {
+    String? etag,
+  }) async {
+    if (failure != null) throw failure!;
+    seenEtag = etag;
+    return pushed;
+  }
+
+  @override
+  Future<List<GitHubActivity>> fetchRecentCommits(
+    String token, {
+    required String repository,
+    required String login,
+    required DateTime since,
+  }) async {
+    polledRepositories.add(repository);
+    return recent[repository] ?? const [];
+  }
+
   @override
   Future<RateBudget> fetchRateBudget(String token) async =>
       const RateBudget(4870, 5000);
@@ -243,6 +269,125 @@ void main() {
     expect(await events(), isEmpty);
     expect(await repo.watchStatus().first, isNull);
     expect(await db.select(db.trackedRepositories).get(), isEmpty);
+  });
+
+  group('live polling', () {
+    late DateTime pushedAt;
+
+    Future<void> connectAndSync() async {
+      await repo.completeConnection('t', 'repo');
+      await repo.sync();
+      now = now.add(const Duration(minutes: 10));
+      pushedAt = now.subtract(const Duration(minutes: 1));
+    }
+
+    test('imports commits only from repositories that changed', () async {
+      await connectAndSync();
+      client
+        ..pushed = PushedRepositories('tag1', [
+          PushedRepository('me/app', pushedAt),
+          PushedRepository('me/old', now.subtract(const Duration(days: 40))),
+        ])
+        ..recent = {
+          'me/app': [commit('new', 'me/app', pushedAt)],
+        };
+
+      await repo.pollForPushes();
+
+      expect(client.polledRepositories, ['me/app']);
+      expect((await events()).single.externalId, 'commit:new');
+    });
+
+    test('an unchanged answer does nothing and reuses the etag', () async {
+      await connectAndSync();
+      client.pushed = const PushedRepositories('tag1', []);
+      await repo.pollForPushes();
+      expect(client.seenEtag, isNull);
+
+      client.pushed = null;
+      await repo.pollForPushes();
+      expect(client.seenEtag, 'tag1');
+      expect(client.polledRepositories, isEmpty);
+    });
+
+    test('does not duplicate what a full sync already found', () async {
+      await repo.completeConnection('t', 'repo');
+      client.activity = [commit('same', 'me/app', now)];
+      await repo.sync();
+      now = now.add(const Duration(minutes: 10));
+      client
+        ..pushed = PushedRepositories('t', [PushedRepository('me/app', now)])
+        ..recent = {
+          'me/app': [commit('same', 'me/app', now)],
+        };
+
+      await repo.pollForPushes();
+      expect(await events(), hasLength(1));
+    });
+
+    test('skips ignored repositories', () async {
+      await connectAndSync();
+      final dotfiles = (await repo.watchRepositories().first).firstWhere(
+        (r) => r.fullName == 'me/dotfiles',
+      );
+      await repo.setRepositoryIgnored(dotfiles, ignored: true);
+      client.pushed = PushedRepositories('t', [
+        PushedRepository('me/dotfiles', pushedAt),
+      ]);
+
+      await repo.pollForPushes();
+      expect(client.polledRepositories, isEmpty);
+    });
+
+    test('does nothing before the first sync or while private', () async {
+      await repo.completeConnection('t', 'repo');
+      client.pushed = PushedRepositories('t', [
+        PushedRepository('me/app', now),
+      ]);
+      await repo.pollForPushes();
+      expect(client.polledRepositories, isEmpty);
+
+      await repo.sync();
+      now = now.add(const Duration(minutes: 10));
+      await db.writeSetting(privateSessionSettingKey, 'true');
+      client.pushed = PushedRepositories('t', [
+        PushedRepository('me/app', now),
+      ]);
+      await repo.pollForPushes();
+      expect(client.polledRepositories, isEmpty);
+    });
+
+    test('commits from a private stretch stay out', () async {
+      await connectAndSync();
+      final floor = now.subtract(const Duration(minutes: 2));
+      await db.writeSetting(
+        importFloorSettingKey,
+        '${floor.millisecondsSinceEpoch}',
+      );
+      client
+        ..pushed = PushedRepositories('t', [PushedRepository('me/app', now)])
+        ..recent = {
+          'me/app': [
+            commit(
+              'during',
+              'me/app',
+              floor.subtract(const Duration(hours: 1)),
+            ),
+            commit('after', 'me/app', now),
+          ],
+        };
+
+      await repo.pollForPushes();
+      expect((await events()).map((e) => e.externalId), ['commit:after']);
+    });
+
+    test('a rejected token stops polling and asks to reconnect', () async {
+      await connectAndSync();
+      client.failure = const GitHubFailure(GitHubFailureKind.revoked);
+
+      await expectLater(repo.pollForPushes(), throwsA(isA<GitHubFailure>()));
+      expect((await repo.watchStatus().first)?.needsReconnect, isTrue);
+    });
   });
 
   test('reconnecting reuses the same source', () async {

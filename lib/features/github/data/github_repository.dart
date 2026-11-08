@@ -12,6 +12,11 @@ const _firstSyncWindow = Duration(days: 30);
 /// Re-reads a little history, because GitHub's search index lags behind.
 const _overlap = Duration(days: 1);
 
+/// Pushes can land while a check is running.
+const _pollOverlap = Duration(minutes: 5);
+
+const _maxReposPerPoll = 5;
+
 class GitHubRepository {
   GitHubRepository({
     required AppDatabase database,
@@ -24,6 +29,9 @@ class GitHubRepository {
   final GitHubClient _client;
   final GitHubTokenStore _tokens;
   final DateTime Function() _clock;
+
+  /// Held in memory: after a restart the first check is simply a full one.
+  String? _etag;
 
   Stream<GitHubStatus?> watchStatus() => _db
       .customSelect(
@@ -123,43 +131,12 @@ class GitHubRepository {
         until: now,
       );
     } on GitHubFailure catch (failure) {
-      if (failure.kind == GitHubFailureKind.revoked) {
-        await _updateSource(
-          source.id,
-          const DataSourcesCompanion(status: Value(SourceStatus.error)),
-        );
-      }
+      await _flagIfRevoked(source.id, failure);
       rethrow;
     }
 
-    final known = await _repositoriesFor(source.id);
-    final ignored = {
-      for (final repo in known)
-        if (repo.ignored) repo.fullName,
-    };
-    final deleted = await _tombstones(source.id);
-    final fresh = activity
-        .where((a) => !ignored.contains(a.repository))
-        .where((a) => !deleted.contains(a.externalId))
-        .where((a) => !a.occurredAt.isBefore(since))
-        .toList();
-
     await _db.transaction(() async {
-      await _addRepositories(source.id, fresh.map((a) => a.repository));
-      await _db.batch(
-        (batch) => batch.insertAll(_db.activityEvents, [
-          for (final item in fresh)
-            ActivityEventsCompanion.insert(
-              sourceId: source.id,
-              externalId: Value(item.externalId),
-              kind: item.kind,
-              category: ActivityCategory.coding,
-              title: item.title,
-              domain: Value(item.repository),
-              startedAt: item.occurredAt,
-            ),
-        ], mode: InsertMode.insertOrIgnore),
-      );
+      await _store(source.id, activity, notBefore: since);
       await _updateSource(
         source.id,
         DataSourcesCompanion(
@@ -170,6 +147,111 @@ class GitHubRepository {
       );
     });
   }
+
+  /// A light check for new pushes, made every minute while the app is open.
+  /// Picks up commits on any branch, without waiting for GitHub's search.
+  Future<void> pollForPushes() async {
+    final source = await _source();
+    if (source == null ||
+        source.status != SourceStatus.connected ||
+        source.lastSyncedAt == null) {
+      return;
+    }
+    if (await _db.readSetting(privateSessionSettingKey) == 'true') return;
+    final token = await _tokens.read();
+    if (token == null) return;
+
+    final now = _clock();
+    try {
+      final pushed = await _client.fetchPushedRepositories(token, etag: _etag);
+      if (pushed == null) return;
+
+      final floor = await _importFloor();
+      final cursor =
+          int.tryParse(
+            await _db.readSetting(githubPollCursorSettingKey) ?? '',
+          ) ??
+          source.lastSyncedAt!.millisecondsSinceEpoch;
+      final lastChecked = DateTime.fromMillisecondsSinceEpoch(cursor)
+          .subtract(_pollOverlap);
+      final since = lastChecked.isAfter(floor) ? lastChecked : floor;
+      final ignored = await _ignoredNames(source.id);
+      final changed = pushed.repositories
+          .where((r) => r.pushedAt.isAfter(since))
+          .where((r) => !ignored.contains(r.fullName))
+          .take(_maxReposPerPoll);
+
+      final commits = <GitHubActivity>[];
+      for (final repository in changed) {
+        commits.addAll(
+          await _client.fetchRecentCommits(
+            token,
+            repository: repository.fullName,
+            login: source.accountLabel ?? '',
+            since: since,
+          ),
+        );
+      }
+      await _db.transaction(() async {
+        // Author dates can predate the push, so only the floor applies here.
+        await _store(source.id, commits, notBefore: floor);
+        await _db.writeSetting(
+          githubPollCursorSettingKey,
+          '${now.millisecondsSinceEpoch}',
+        );
+      });
+      _etag = pushed.etag;
+    } on GitHubFailure catch (failure) {
+      await _flagIfRevoked(source.id, failure);
+      rethrow;
+    }
+  }
+
+  Future<void> _flagIfRevoked(String sourceId, GitHubFailure failure) async {
+    if (failure.kind != GitHubFailureKind.revoked) return;
+    await _updateSource(
+      sourceId,
+      const DataSourcesCompanion(status: Value(SourceStatus.error)),
+    );
+  }
+
+  Future<void> _store(
+    String sourceId,
+    List<GitHubActivity> activity, {
+    required DateTime notBefore,
+  }) async {
+    final ignored = await _ignoredNames(sourceId);
+    final deleted = await _tombstones(sourceId);
+    final fresh = activity
+        .where((a) => !ignored.contains(a.repository))
+        .where((a) => !deleted.contains(a.externalId))
+        .where((a) => !a.occurredAt.isBefore(notBefore))
+        .toList();
+    await _addRepositories(sourceId, fresh.map((a) => a.repository));
+    await _db.batch(
+      (batch) => batch.insertAll(_db.activityEvents, [
+        for (final item in fresh)
+          ActivityEventsCompanion.insert(
+            sourceId: sourceId,
+            externalId: Value(item.externalId),
+            kind: item.kind,
+            category: ActivityCategory.coding,
+            title: item.title,
+            domain: Value(item.repository),
+            startedAt: item.occurredAt,
+          ),
+      ], mode: InsertMode.insertOrIgnore),
+    );
+  }
+
+  Future<Set<String>> _ignoredNames(String sourceId) async => {
+    for (final repo in await _repositoriesFor(sourceId))
+      if (repo.ignored) repo.fullName,
+  };
+
+  Future<DateTime> _importFloor() async => DateTime.fromMillisecondsSinceEpoch(
+    int.tryParse(await _db.readSetting(importFloorSettingKey) ?? '') ?? 0,
+  );
 
   /// Ignoring a repository also deletes what was recorded from it.
   Future<void> setRepositoryIgnored(
@@ -191,6 +273,8 @@ class GitHubRepository {
   /// Removes the token. With [keepEvents] false, its history goes too.
   Future<void> disconnect({required bool keepEvents}) async {
     await _tokens.clear();
+    _etag = null;
+    await _db.deleteSetting(githubPollCursorSettingKey);
     final source = await _source();
     if (source == null) return;
     if (keepEvents) {
