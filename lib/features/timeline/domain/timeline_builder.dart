@@ -36,6 +36,8 @@ TimelineEntry _entryFor(TrackedActivity activity) => TimelineEntry(
       ? 'Excluded from reports'
       : activity.isCorrected
       ? 'Corrected by you'
+      : activity.repository != null
+      ? '${activity.repository} · observed'
       : 'Observed',
   attribution: activity.isPrivate ? Attribution.hidden : Attribution.observed,
 );

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/detail_widgets.dart';
@@ -56,7 +55,7 @@ class _SelfHostedGitScreenState extends State<SelfHostedGitScreen> {
       title: 'Add Git instance',
       footer: [
         FilledButton(
-          onPressed: () => context.push('/integrations/github/connect'),
+          onPressed: () => showToast(context, notAvailableYet),
           child: const Text('Continue'),
         ),
         TextButton(

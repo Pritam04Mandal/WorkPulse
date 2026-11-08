@@ -11,6 +11,7 @@ import 'package:workpulse/features/auth/data/auth_repository_impl.dart';
 import 'package:workpulse/features/auth/domain/auth_contracts.dart';
 import 'package:workpulse/features/auth/domain/auth_models.dart';
 import 'package:workpulse/features/auth/presentation/session_controller.dart';
+import 'package:workpulse/features/github/presentation/github_controller.dart';
 import 'package:workpulse/features/tracking/data/usage_gateway.dart';
 import 'package:workpulse/features/tracking/domain/usage_models.dart';
 import 'package:workpulse/features/tracking/presentation/tracking_controller.dart';
@@ -67,6 +68,11 @@ class _IdleTracking extends TrackingController {
   Future<void> refresh() async {}
 }
 
+class _IdleGitHub extends GitHubSync {
+  @override
+  Future<void> refresh({bool force = false}) async {}
+}
+
 void main() {
   group('onboardingRedirect', () {
     String? redirect(bool done, String location) =>
@@ -110,6 +116,7 @@ void main() {
         overrides: [
           databaseProvider.overrideWithValue(db),
           trackingControllerProvider.overrideWith(_IdleTracking.new),
+          githubSyncProvider.overrideWith(_IdleGitHub.new),
           authRepositoryProvider.overrideWithValue(
             AuthRepositoryImpl(
               database: db,

@@ -8,6 +8,7 @@ import '../../../core/format/durations.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/app_widgets.dart';
 import '../../auth/presentation/session_controller.dart';
+import '../../github/presentation/github_controller.dart';
 import '../../tracking/domain/usage_models.dart';
 import '../../tracking/presentation/tracking_controller.dart';
 import '../domain/dashboard_summary.dart';
@@ -20,7 +21,12 @@ final dashboardSummaryProvider = Provider<DashboardSummary>((ref) {
   ref.watch(trackingControllerProvider.select((s) => s.lastSyncedAt));
   final today = startOfDay(DateTime.now());
   final activities = ref.watch(dayActivitiesProvider(today)).value ?? const [];
-  return buildDashboardSummary(activities, usageGranted: granted);
+  final github = ref.watch(githubStatusProvider).value;
+  return buildDashboardSummary(
+    activities,
+    usageGranted: granted,
+    githubConnected: github?.connected ?? false,
+  );
 });
 
 Color _categoryColor(ActivityCategory category) => switch (category) {

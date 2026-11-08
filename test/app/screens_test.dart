@@ -13,6 +13,8 @@ import 'package:workpulse/features/auth/data/auth_repository_impl.dart';
 import 'package:workpulse/features/auth/domain/auth_contracts.dart';
 import 'package:workpulse/features/auth/domain/auth_models.dart';
 import 'package:workpulse/features/auth/presentation/session_controller.dart';
+import 'package:workpulse/features/github/presentation/github_controller.dart';
+import 'package:workpulse/features/github/data/github_token_store.dart';
 import 'package:workpulse/features/tracking/data/usage_gateway.dart';
 import 'package:workpulse/features/tracking/domain/usage_models.dart';
 import 'package:workpulse/features/tracking/presentation/tracking_controller.dart';
@@ -77,6 +79,24 @@ class _IdleTracking extends TrackingController {
   Future<void> refresh() async {}
 }
 
+class _MemoryGitHubTokens implements GitHubTokenStore {
+  String? token;
+
+  @override
+  Future<String?> read() async => token;
+
+  @override
+  Future<void> save(String value) async => token = value;
+
+  @override
+  Future<void> clear() async => token = null;
+}
+
+class _IdleGitHub extends GitHubSync {
+  @override
+  Future<void> refresh({bool force = false}) async {}
+}
+
 void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
@@ -104,6 +124,8 @@ void main() {
       overrides: [
         databaseProvider.overrideWithValue(db),
         trackingControllerProvider.overrideWith(_IdleTracking.new),
+        githubSyncProvider.overrideWith(_IdleGitHub.new),
+        githubTokenStoreProvider.overrideWithValue(_MemoryGitHubTokens()),
         authRepositoryProvider.overrideWithValue(repository),
         usageAccessGatewayProvider.overrideWithValue(_Gateway()),
         initialSessionProvider.overrideWithValue(
@@ -148,8 +170,6 @@ void main() {
     '/projects/billing-api/edit': 'Edit project',
     '/home/journal': 'Main projects',
     '/integrations': 'Integrations',
-    '/integrations/github': 'Connected as @sample-dev',
-    '/integrations/github/connect': 'Connect GitHub',
     '/integrations/teams': 'Microsoft Teams',
     '/integrations/pair': 'Pair a device',
   };
@@ -168,6 +188,8 @@ void main() {
 
   for (final (route, expected) in const [
     ('/home', 'Today'),
+    ('/integrations/github', 'Not connected'),
+    ('/integrations/github/connect', 'isn’t configured'),
     ('/timeline', 'Timeline'),
     ('/settings', 'Settings'),
     ('/settings/exclusions', 'Chrome'),

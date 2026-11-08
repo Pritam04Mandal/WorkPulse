@@ -46,6 +46,7 @@ class TrackedActivity {
     required this.start,
     this.end,
     this.application,
+    this.repository,
     this.projectId,
     this.mergedEvents = 1,
     this.isPrivate = false,
@@ -61,6 +62,9 @@ class TrackedActivity {
   /// Null for point events such as a commit.
   final DateTime? end;
   final String? application;
+
+  /// `owner/name`, for events from a Git host.
+  final String? repository;
   final String? projectId;
   final int mergedEvents;
   final bool isPrivate;

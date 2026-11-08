@@ -2,6 +2,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/presentation/session_controller.dart';
+import '../../github/domain/github_models.dart';
+import '../../github/presentation/github_controller.dart';
 import '../data/tracking_repository.dart';
 import '../data/usage_gateway.dart';
 import '../domain/usage_models.dart';
@@ -80,6 +82,14 @@ class TrackingController extends Notifier<TrackingState> {
   }
 
   Future<void> setPrivateSession(bool on) async {
+    // GitHub keeps its history, so bring it up to date before the pause.
+    if (on) {
+      try {
+        await ref.read(githubSyncProvider.notifier).refresh(force: true);
+      } on GitHubFailure {
+        // Privacy must never depend on the network.
+      }
+    }
     await _repository.setPrivateSession(on);
     if (!ref.mounted) return;
     state = TrackingState(

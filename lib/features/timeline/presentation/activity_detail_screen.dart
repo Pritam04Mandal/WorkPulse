@@ -145,6 +145,8 @@ class ActivityDetailScreen extends ConsumerWidget {
           KeyValueList(
             rows: [
               ('Source', activity.sourceLabel, false),
+              if (activity.repository != null)
+                ('Repository', activity.repository!, true),
               if (activity.application != null)
                 ('Application', activity.application!, true),
               ('Project', 'No project', false),
@@ -154,6 +156,8 @@ class ActivityDetailScreen extends ConsumerWidget {
                 'Recorded',
                 activity.isCorrected
                     ? 'Corrected by you'
+                    : activity.end == null
+                    ? 'Observed event'
                     : 'Observed start and end',
                 false,
               ),

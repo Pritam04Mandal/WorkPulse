@@ -7,6 +7,7 @@ class AuthConfig {
     ),
     this.msalClientId = const String.fromEnvironment('MSAL_CLIENT_ID'),
     this.msalRedirectUri = const String.fromEnvironment('MSAL_REDIRECT_URI'),
+    this.githubClientId = const String.fromEnvironment('GITHUB_CLIENT_ID'),
   });
 
   /// The Web client ID from Google Cloud, needed for an Android ID token.
@@ -15,6 +16,9 @@ class AuthConfig {
 
   /// `msauth://<package>/<url-encoded signature hash>`.
   final String msalRedirectUri;
+
+  /// From a GitHub OAuth App with Device Flow enabled. Not a secret.
+  final String githubClientId;
 
   bool get isGoogleConfigured => googleServerClientId.isNotEmpty;
   bool get isMicrosoftConfigured =>

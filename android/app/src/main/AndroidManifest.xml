@@ -57,6 +57,11 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <!-- Lets WorkPulse open github.com for the one-time code. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
         <!-- Lets WorkPulse show app names and identify launchers. -->
         <intent>
             <action android:name="android.intent.action.MAIN"/>

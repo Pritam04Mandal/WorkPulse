@@ -253,6 +253,7 @@ class TrackingRepository {
     start: row.startedAt,
     end: row.endedAt,
     application: row.application,
+    repository: row.domain,
     projectId: row.projectId,
     mergedEvents: row.mergedEventCount,
     isPrivate: row.isPrivate,

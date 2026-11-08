@@ -116,6 +116,7 @@ RecentActivity _recent(TrackedActivity activity) => RecentActivity(
 DashboardSummary buildDashboardSummary(
   List<TrackedActivity> activities, {
   required bool usageGranted,
+  bool githubConnected = false,
 }) {
   final visible = activities.where((a) => !a.isPrivate).toList();
   final timed = visible.where((a) => a.duration != null).toList();
@@ -144,6 +145,20 @@ DashboardSummary buildDashboardSummary(
   final aiSessions = aiCounts.values.fold(0, (sum, n) => sum + n);
 
   final gitEvents = visible.where((a) => _gitKinds.contains(a.kind)).length;
+  int countKind(ActivityKind kind) =>
+      visible.where((a) => a.kind == kind).length;
+  String plural(int n, String word) => '$n $word${n == 1 ? '' : 's'}';
+  final gitCaption = [
+    if (countKind(ActivityKind.commit) > 0)
+      plural(countKind(ActivityKind.commit), 'commit'),
+    if (countKind(ActivityKind.pullRequest) > 0)
+      plural(countKind(ActivityKind.pullRequest), 'PR'),
+    if (countKind(ActivityKind.review) > 0)
+      plural(countKind(ActivityKind.review), 'review'),
+    if (countKind(ActivityKind.issue) > 0)
+      plural(countKind(ActivityKind.issue), 'issue'),
+  ].join(' · ');
+  final sources = visible.map((a) => a.sourceLabel).toSet();
   final projects = visible.map((a) => a.projectId).nonNulls.toSet().length;
   final unassigned = totalOf(timed.where((a) => a.projectId == null));
 
@@ -162,7 +177,11 @@ DashboardSummary buildDashboardSummary(
       StatTile(
         label: 'Observed events',
         value: '${visible.length}',
-        caption: visible.isEmpty ? 'none yet today' : 'from Android usage',
+        caption: switch (sources.length) {
+          0 => 'none yet today',
+          1 => 'from ${sources.single}',
+          final n => 'from $n sources',
+        },
         destination: DashboardDestination.timeline,
       ),
       StatTile(
@@ -174,7 +193,11 @@ DashboardSummary buildDashboardSummary(
       StatTile(
         label: 'GitHub',
         value: '$gitEvents',
-        caption: gitEvents == 0 ? 'Not connected' : 'events today',
+        caption: gitEvents > 0
+            ? gitCaption
+            : githubConnected
+            ? 'Nothing today'
+            : 'Not connected',
         destination: DashboardDestination.github,
       ),
       StatTile(
@@ -193,8 +216,11 @@ DashboardSummary buildDashboardSummary(
               '${byApp.length} ${byApp.length == 1 ? 'app' : 'apps'} used '
               'across ${timed.length} '
               '${timed.length == 1 ? 'session' : 'sessions'}.',
-    integrationsLabel: usageGranted
-        ? 'Android usage active'
-        : 'No sources connected',
+    integrationsLabel: switch ((usageGranted ? 1 : 0) +
+        (githubConnected ? 1 : 0)) {
+      0 => 'No sources connected',
+      1 => '1 source connected',
+      final n => '$n sources connected',
+    },
   );
 }
