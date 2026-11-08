@@ -31,15 +31,10 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["msalSignatureHash"] = msalHash("debug")
     }
 
     buildTypes {
-        debug {
-            manifestPlaceholders["msalSignatureHash"] = msalHash("debug")
-        }
-        profile {
-            manifestPlaceholders["msalSignatureHash"] = msalHash("debug")
-        }
         release {
             manifestPlaceholders["msalSignatureHash"] = msalHash("release")
             // TODO: Add your own signing config for the release build.
