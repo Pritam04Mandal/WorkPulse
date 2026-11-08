@@ -32,6 +32,7 @@ class TimelineEntry {
     this.workspace,
     this.mergedFrom,
     this.elapsed,
+    this.isLive = false,
   });
 
   final String id;
@@ -55,6 +56,9 @@ class TimelineEntry {
 
   /// Exact length when known; [start] and [end] only have minute precision.
   final Duration? elapsed;
+
+  /// Still in progress on a paired computer.
+  final bool isLive;
 
   bool get isGap => kind == EntryKind.gap;
   bool get isInferred => attribution == Attribution.inferred;

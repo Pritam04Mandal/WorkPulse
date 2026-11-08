@@ -39,6 +39,7 @@ void main() {
   late CompanionServer server;
   late Directory home;
   late Map<String, String> env;
+  final liveReports = <(Set<String>, Set<String>)>[];
 
   String address() => '127.0.0.1:${server.port}';
 
@@ -90,12 +91,17 @@ void main() {
     db = AppDatabase(NativeDatabase.memory());
     secrets = MemorySecrets();
     repository = CompanionRepository(database: db, secrets: secrets);
-    server = CompanionServer(repository);
+    liveReports.clear();
+    server = CompanionServer(
+      repository,
+      onLive: (working, finished) => liveReports.add((working, finished)),
+    );
     await server.start(port: 0);
     home = await Directory.systemTemp.createTemp('workpulse-test');
     env = {
       'WORKPULSE_HOME': '${home.path}/state',
       'CLAUDE_CONFIG_DIR': '${home.path}/claude',
+      'WORKPULSE_TICK_S': '0.1',
     };
   });
 
@@ -168,6 +174,87 @@ void main() {
     final state = File('${home.path}/state/state.json').readAsStringSync();
     expect(state, isNot(contains('my secret prompt text')));
     expect(rows.single.title, isNot(contains('my secret prompt text')));
+  });
+
+  group('live updates', () {
+    Future<bool> until(bool Function() done) async {
+      for (var i = 0; i < 80 && !done(); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+      return done();
+    }
+
+    test('a prompt appears at once and counts prompts, with no text', () async {
+      await pairDevice();
+      final start = DateTime.now().millisecondsSinceEpoch;
+
+      await hook(
+        'UserPromptSubmit',
+        atMs: start,
+        extra: ',"prompt":"do not send this"',
+      );
+      var rows = await eventually((r) => r.isNotEmpty);
+      expect(rows.single.mergedEventCount, 1);
+      expect(rows.single.title, isNot(contains('do not send')));
+      expect(
+        await until(() => liveReports.any((r) => r.$1.isNotEmpty)),
+        isTrue,
+      );
+
+      await hook('UserPromptSubmit', atMs: start + 1000);
+      rows = await eventually((r) => r.single.mergedEventCount == 2);
+      expect(rows.single.mergedEventCount, 2);
+    });
+
+    test('finishing clears the live state', () async {
+      await pairDevice();
+      final start = DateTime.now().millisecondsSinceEpoch;
+
+      await hook('UserPromptSubmit', atMs: start);
+      expect(
+        await until(() => liveReports.any((r) => r.$1.isNotEmpty)),
+        isTrue,
+      );
+      await hook('Stop', atMs: start + 2000);
+
+      expect(
+        await until(() => liveReports.any((r) => r.$2.isNotEmpty)),
+        isTrue,
+      );
+    });
+
+    test('heartbeats extend a session while the transcript changes', () async {
+      await pairDevice();
+      final transcript = File('${home.path}/transcript.jsonl')
+        ..writeAsStringSync('');
+      await hook(
+        'UserPromptSubmit',
+        extra: ',"transcript_path":"${transcript.path}"',
+      );
+      await eventually((r) => r.isNotEmpty);
+
+      await Future<void>.delayed(const Duration(milliseconds: 2200));
+      transcript.writeAsStringSync('more');
+
+      final rows = await eventually(
+        (r) => r.single.endedAt!.difference(r.single.startedAt).inSeconds >= 2,
+      );
+      expect(
+        rows.single.endedAt!.difference(rows.single.startedAt).inSeconds,
+        greaterThanOrEqualTo(2),
+      );
+    });
+
+    test('an interrupted turn stops being live on its own', () async {
+      await pairDevice();
+      // No transcript activity and no Stop hook: what an interrupt looks like.
+      await hook('UserPromptSubmit');
+
+      expect(
+        await until(() => liveReports.any((r) => r.$2.isNotEmpty)),
+        isTrue,
+      );
+    });
   });
 
   test('coming back after the idle gap starts a new segment', () async {
@@ -418,6 +505,7 @@ void main() {
       expect(saved['hooks']['Stop'], hasLength(2));
       expect(saved['hooks']['UserPromptSubmit'], hasLength(1));
       expect(saved['hooks']['SessionEnd'], hasLength(1));
+      expect(saved['hooks']['PreToolUse'][0]['hooks'][0]['async'], isTrue);
 
       expect((await run(['uninstall'])).exitCode, 0);
       saved = jsonDecode(settings().readAsStringSync()) as Map;

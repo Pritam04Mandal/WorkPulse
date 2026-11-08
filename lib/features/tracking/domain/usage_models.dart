@@ -45,6 +45,7 @@ class TrackedActivity {
     required this.title,
     required this.start,
     this.end,
+    this.externalId,
     this.application,
     this.repository,
     this.projectId,
@@ -61,6 +62,7 @@ class TrackedActivity {
 
   /// Null for point events such as a commit.
   final DateTime? end;
+  final String? externalId;
   final String? application;
 
   /// `owner/name`, for events from a Git host.

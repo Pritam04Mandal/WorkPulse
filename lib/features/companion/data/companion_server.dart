@@ -37,12 +37,16 @@ class CompanionServer {
   CompanionServer(
     this._repository, {
     this.onPaired,
+    this.onLive,
     this._clock = DateTime.now,
     Random? random,
   }) : _random = random ?? Random.secure();
 
   final CompanionRepository _repository;
   final void Function()? onPaired;
+
+  /// Reports sessions in progress and sessions that just finished.
+  final void Function(Set<String> working, Set<String> finished)? onLive;
   final DateTime Function() _clock;
   final Random _random;
 
@@ -196,7 +200,8 @@ class CompanionServer {
         .map((item) => ClaudeSegment.parse(item, now: now))
         .nonNulls
         .toList();
-    await _repository.ingest(deviceId, segments);
+    final live = await _repository.ingest(deviceId, segments);
+    onLive?.call(live.working, live.finished);
     return {'accepted': segments.length};
   }
 }

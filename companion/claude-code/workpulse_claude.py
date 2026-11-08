@@ -52,7 +52,15 @@ PRIME = int(
 IDLE_GAP_MS = 15 * 60 * 1000
 MAX_BATCH = 200
 KEEP_PENDING_MS = 7 * 24 * 60 * 60 * 1000
-HOOK_EVENTS = ("UserPromptSubmit", "Stop", "SessionEnd")
+HOOK_EVENTS = ("UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop", "SessionEnd")
+# These fire for every tool call, so they must never hold Claude up.
+BACKGROUND_EVENTS = ("PreToolUse", "PostToolUse")
+# While Claude works, send a heartbeat this often.
+TICK_SECONDS = float(os.environ.get("WORKPULSE_TICK_S") or 10)
+# Claude counts as working if its transcript file changed this recently.
+TRANSCRIPT_FRESH_MS = 2 * 60 * 1000
+# Stops a tool that never reported finishing from looking busy forever.
+TOOL_LIMIT_MS = 10 * 60 * 1000
 HOOK_MARKER = "workpulse_claude.py"
 
 STATE_DIR = Path(os.environ.get("WORKPULSE_HOME") or Path.home() / ".workpulse")
@@ -214,9 +222,10 @@ def command_install():
     hooks = settings.setdefault("hooks", {})
     for event in HOOK_EVENTS:
         kept = [entry for entry in hooks.get(event, []) if not is_ours(entry)]
-        kept.append(
-            {"hooks": [{"type": "command", "command": hook_command(), "timeout": 5}]}
-        )
+        hook = {"type": "command", "command": hook_command(), "timeout": 5}
+        if event in BACKGROUND_EVENTS:
+            hook["async"] = True
+        kept.append({"hooks": [hook]})
         hooks[event] = kept
     save_settings(path, settings)
     print(f"Hooks added to {path}. Restart any open Claude Code sessions.")
@@ -283,12 +292,26 @@ def describe_project(cwd):
     return project[:100], (match.group(1)[:140] if match else None)
 
 
+def snapshot(session_id, session):
+    segment_id = f"{session_id}.{session['segment']}"
+    return segment_id, {
+        "id": segment_id,
+        "project": session["project"],
+        "repo": session.get("repo"),
+        "start": session["start"],
+        "end": session["last"],
+        "prompts": session.get("prompts", 0),
+        "working": session.get("working", False),
+    }
+
+
 def record(event):
-    """Only these three fields are read. The prompt text is ignored."""
+    """Returns the background jobs to start. The prompt text is never read:
+    only the session ID, event name, folder and transcript path are used."""
     session_id = re.sub(r"[^A-Za-z0-9_-]", "", str(event.get("session_id", "")))[:80]
     name = event.get("hook_event_name")
     if not session_id or name not in HOOK_EVENTS:
-        return
+        return []
     cwd = str(event.get("cwd") or os.getcwd())
     now = now_ms()
 
@@ -311,29 +334,44 @@ def record(event):
                     "last": now,
                     "project": project,
                     "repo": repo,
+                    "prompts": 0,
                 }
                 sessions[session_id] = session
+            session["prompts"] = session.get("prompts", 0) + 1
+            session["transcript"] = str(event.get("transcript_path") or "")
         elif session is None:
-            return
+            return []
 
+        was_working = session.get("working", False)
         session["last"] = now
-        segment_id = f"{session_id}.{session['segment']}"
-        pending[segment_id] = {
-            "id": segment_id,
-            "project": session["project"],
-            "repo": session.get("repo"),
-            "start": session["start"],
-            "end": now,
-        }
+        if name == "UserPromptSubmit":
+            session["working"] = True
+            session["tool_started"] = None
+        elif name == "PreToolUse":
+            session["working"] = True
+            session["tool_started"] = now
+        elif name == "PostToolUse":
+            session["working"] = True
+            session["tool_started"] = None
+        else:
+            session["working"] = False
+            session["tool_started"] = None
+
+        segment_id, item = snapshot(session_id, session)
+        pending[segment_id] = item
         if name == "SessionEnd":
             sessions.pop(session_id, None)
         write_private(STATE_FILE, state)
 
+    if name in BACKGROUND_EVENTS:
+        return ["ticker"] if not was_working else []
+    return ["flush", "ticker"] if name == "UserPromptSubmit" else ["flush"]
 
-def flush_in_background():
+
+def spawn(job):
     """Hooks must return at once, even when the phone can't be reached."""
     subprocess.Popen(
-        [sys.executable, str(Path(__file__).resolve()), "flush"],
+        [sys.executable, str(Path(__file__).resolve()), job],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -345,11 +383,61 @@ def command_hook():
     # Anything printed here would be added to Claude's context, and a failure
     # must never disturb the session, so this stays silent and always exits 0.
     try:
-        record(json.loads(sys.stdin.read()))
-        flush_in_background()
+        for job in record(json.loads(sys.stdin.read())):
+            spawn(job)
     except Exception:  # pylint: disable=broad-except
         pass
     return 0
+
+
+def still_working(session, now):
+    """Whether Claude is busy, and when it last visibly did something. Looks
+    only at the transcript's modified time, never at what's inside it."""
+    started = session.get("tool_started")
+    if started and now - started < TOOL_LIMIT_MS:
+        return True, None
+    try:
+        modified = int(os.path.getmtime(session.get("transcript") or "") * 1000)
+    except OSError:
+        return False, None
+    return (True, modified) if now - modified < TRANSCRIPT_FRESH_MS else (False, None)
+
+
+def tick():
+    now = now_ms()
+    any_working = False
+    with locked():
+        state = read_json(STATE_FILE, {})
+        pending = state.setdefault("pending", {})
+        for session_id, session in state.get("sessions", {}).items():
+            if not session.get("working"):
+                continue
+            working, seen = still_working(session, now)
+            if seen:
+                session["last"] = max(session["last"], seen)
+            session["working"] = working
+            any_working = any_working or working
+            segment_id, item = snapshot(session_id, session)
+            pending[segment_id] = item
+        write_private(STATE_FILE, state)
+    return any_working
+
+
+def command_ticker():
+    """Sends heartbeats while Claude works, then exits. One runs at a time."""
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    with open(STATE_DIR / "ticker.lock", "w", encoding="utf-8") as lock:
+        if fcntl:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                return 0
+        while True:
+            time.sleep(TICK_SECONDS)
+            working = tick()
+            command_flush()
+            if not working:
+                return 0
 
 
 def command_flush():
@@ -364,7 +452,9 @@ def command_flush():
             for key, value in state.get("pending", {}).items()
             if value["end"] >= oldest
         }
-    batch = [v for v in pending.values() if v["end"] > v["start"]][:MAX_BATCH]
+    # A zero-length segment still matters: it starts or ends the live state.
+    batch = [v for v in pending.values() if v["end"] > v["start"] or "working" in v]
+    batch = batch[:MAX_BATCH]
     if not batch:
         return 0
 
@@ -388,14 +478,17 @@ def command_flush():
     except (OSError, ValueError):
         return 0  # Phone closed or away: these stay queued for the next hook.
 
-    sent = {item["id"]: item["end"] for item in batch}
+    def fingerprint(item):
+        return item["end"], item.get("working"), item.get("prompts")
+
+    sent = {item["id"]: fingerprint(item) for item in batch}
     with locked():
         state = read_json(STATE_FILE, {})
         current = state.get("pending", {})
         state["pending"] = {
             key: value
             for key, value in current.items()
-            if value["end"] != sent.get(key)
+            if fingerprint(value) != sent.get(key)
         }
         write_private(STATE_FILE, state)
     return 0
@@ -415,6 +508,11 @@ def main(arguments):
         return command_hook()
     if command == "flush":
         return command_flush()
+    if command == "ticker":
+        try:
+            return command_ticker()
+        except Exception:  # pylint: disable=broad-except
+            return 0
     print(__doc__, file=sys.stderr)
     return 2
 

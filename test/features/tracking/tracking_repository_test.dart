@@ -232,6 +232,34 @@ void main() {
       expect(summary.dailySummary, contains('Chrome (20m)'));
     });
 
+    test('a live session is tagged and its time keeps running', () {
+      final start = DateTime(2026, 11, 9, 9);
+      final session = TrackedActivity(
+        id: 'a',
+        externalId: 'ext',
+        kind: ActivityKind.aiSession,
+        category: ActivityCategory.ai,
+        title: 'Claude Code · app',
+        start: start,
+        end: start.add(const Duration(seconds: 10)),
+        mergedEvents: 3,
+      );
+
+      final live = buildTimelineEntries(
+        [session],
+        liveIds: {'ext'},
+        now: start.add(const Duration(minutes: 5)),
+      ).single;
+      expect(live.isLive, isTrue);
+      expect(live.tag, 'Live · 3 prompts');
+      expect(live.duration, const Duration(minutes: 5));
+
+      final done = buildTimelineEntries([session]).single;
+      expect(done.isLive, isFalse);
+      expect(done.tag, '3 prompts');
+      expect(done.duration, const Duration(seconds: 10));
+    });
+
     test('an empty day gives an honest summary', () {
       final summary = buildDashboardSummary(const [], usageGranted: false);
       expect(summary.latest, isNull);

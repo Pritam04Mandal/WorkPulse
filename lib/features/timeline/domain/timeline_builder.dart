@@ -24,26 +24,47 @@ EntryKind entryKindFor(TrackedActivity activity) {
   };
 }
 
-TimelineEntry _entryFor(TrackedActivity activity) => TimelineEntry(
+String _tagFor(TrackedActivity activity, {required bool live}) {
+  final parts = [
+    if (live) 'Live',
+    if (activity.kind == ActivityKind.aiSession)
+      '${activity.mergedEvents} '
+          '${activity.mergedEvents == 1 ? 'prompt' : 'prompts'}',
+    if (activity.repository != null) activity.repository!,
+  ];
+  return parts.isEmpty ? 'Observed' : parts.join(' · ');
+}
+
+TimelineEntry _entryFor(
+  TrackedActivity activity, {
+  required bool live,
+  required DateTime now,
+}) => TimelineEntry(
   id: activity.id,
   kind: entryKindFor(activity),
   start: TimeOfDay.fromDateTime(activity.start),
   end: activity.end == null ? null : TimeOfDay.fromDateTime(activity.end!),
-  elapsed: activity.duration,
+  elapsed: live ? now.difference(activity.start) : activity.duration,
+  isLive: live,
   title: activity.isPrivate ? 'Private session' : activity.title,
   source: activity.isPrivate ? 'Details hidden' : activity.sourceLabel,
   tag: activity.isPrivate
       ? 'Excluded from reports'
       : activity.isCorrected
       ? 'Corrected by you'
-      : activity.repository != null
-      ? '${activity.repository} · observed'
-      : 'Observed',
+      : activity.kind == ActivityKind.appUsage
+      ? 'Observed'
+      : _tagFor(activity, live: live),
   attribution: activity.isPrivate ? Attribution.hidden : Attribution.observed,
 );
 
 /// Orders a day's activity into rows, with gaps between quiet stretches.
-List<TimelineEntry> buildTimelineEntries(List<TrackedActivity> activities) {
+List<TimelineEntry> buildTimelineEntries(
+  List<TrackedActivity> activities, {
+  Set<String> liveIds = const {},
+  DateTime? now,
+}) {
+  final at = now ?? DateTime.now();
   final rows = <TimelineEntry>[];
   DateTime? lastEnd;
   for (final activity in activities) {
@@ -60,7 +81,13 @@ List<TimelineEntry> buildTimelineEntries(List<TrackedActivity> activities) {
         ),
       );
     }
-    rows.add(_entryFor(activity));
+    rows.add(
+      _entryFor(
+        activity,
+        live: !activity.isPrivate && liveIds.contains(activity.externalId),
+        now: at,
+      ),
+    );
     final end = activity.end ?? activity.start;
     if (previous == null || end.isAfter(previous)) lastEnd = end;
   }

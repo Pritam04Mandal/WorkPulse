@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +10,7 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/app_widgets.dart';
 import '../../../core/widgets/detail_widgets.dart';
 import '../../tracking/domain/usage_models.dart';
+import '../../companion/presentation/companion_controller.dart';
 import '../../tracking/presentation/tracking_controller.dart';
 import '../domain/timeline_builder.dart';
 import '../domain/timeline_entry.dart';
@@ -42,6 +45,23 @@ class TimelineScreen extends ConsumerStatefulWidget {
 class _TimelineScreenState extends ConsumerState<TimelineScreen> {
   var _filter = TimelineFilter.all;
   var _dayOffset = 0;
+  var _hasLive = false;
+  late final Timer _clock;
+
+  @override
+  void initState() {
+    super.initState();
+    // Only redraws while a session is running, so the timers can tick.
+    _clock = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_hasLive && mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _clock.cancel();
+    super.dispose();
+  }
 
   String _dayLabel(DateTime day) {
     final date = DateFormat('d MMM').format(day);
@@ -67,7 +87,11 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
     final today = startOfDay(DateTime.now());
     final day = DateTime(today.year, today.month, today.day - _dayOffset);
     final activities = ref.watch(dayActivitiesProvider(day)).value ?? const [];
-    final entries = buildTimelineEntries(activities);
+    final entries = buildTimelineEntries(
+      activities,
+      liveIds: ref.watch(liveSessionsProvider),
+    );
+    _hasLive = entries.any((e) => e.isLive);
     final rows = filterEntries(entries, _filter);
     final daySub = entries.isEmpty
         ? 'No tracked time'
@@ -297,7 +321,9 @@ class _TimelineRow extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              formatDuration(entry.duration),
+                              entry.isLive
+                                  ? formatElapsed(entry.duration!)
+                                  : formatDuration(entry.duration),
                               style: AppText.mono(
                                 color: AppColors.textSecondary,
                               ),
@@ -306,7 +332,11 @@ class _TimelineRow extends StatelessWidget {
                         ),
                         Text(
                           '${entry.source} · ${entry.tag}',
-                          style: AppText.caption,
+                          style: entry.isLive
+                              ? AppText.caption.copyWith(
+                                  color: AppColors.accent,
+                                )
+                              : AppText.caption,
                         ),
                       ],
                     ),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +10,7 @@ import '../../../core/format/durations.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/app_widgets.dart';
 import '../../auth/presentation/session_controller.dart';
+import '../../companion/presentation/companion_controller.dart';
 import '../../github/presentation/github_controller.dart';
 import '../../tracking/domain/usage_models.dart';
 import '../../tracking/presentation/tracking_controller.dart';
@@ -60,6 +63,11 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final summary = ref.watch(dashboardSummaryProvider);
     final tracking = ref.watch(trackingControllerProvider);
+    final liveIds = ref.watch(liveSessionsProvider);
+    final today = ref.watch(dayActivitiesProvider(startOfDay(DateTime.now())));
+    final live = (today.value ?? const <TrackedActivity>[])
+        .where((a) => !a.isPrivate && liveIds.contains(a.externalId))
+        .toList();
     final user = ref.watch(sessionProvider.select((s) => s.user));
     final initial = (user?.name ?? 'Local').characters.first.toUpperCase();
     final text = Theme.of(context).textTheme;
@@ -133,7 +141,11 @@ class DashboardScreen extends ConsumerWidget {
             ],
             _ActiveTrackingCard(summary: summary),
             const SizedBox(height: 20),
-            if (summary.latest != null) ...[
+            for (final activity in live) ...[
+              _LiveCard(activity: activity),
+              const SizedBox(height: 20),
+            ],
+            if (live.isEmpty && summary.latest != null) ...[
               AppCard(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -267,6 +279,82 @@ class DashboardScreen extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A session in progress on a paired computer, with a running timer.
+class _LiveCard extends StatefulWidget {
+  const _LiveCard({required this.activity});
+
+  final TrackedActivity activity;
+
+  @override
+  State<_LiveCard> createState() => _LiveCardState();
+}
+
+class _LiveCardState extends State<_LiveCard> {
+  late final Timer _clock;
+
+  @override
+  void initState() {
+    super.initState();
+    _clock = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _clock.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activity = widget.activity;
+    final prompts = activity.mergedEvents;
+    final caption = activity.kind == ActivityKind.aiSession
+        ? 'Live now · $prompts ${prompts == 1 ? 'prompt' : 'prompts'}'
+        : 'Live now';
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      onTap: () => context.push('/activity/${activity.id}'),
+      child: Row(
+        spacing: 12,
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: const BoxDecoration(
+              color: AppColors.accent,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(color: AppColors.accentTint, spreadRadius: 4),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  caption,
+                  style: AppText.caption.copyWith(color: AppColors.accent),
+                ),
+                Text(
+                  activity.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ],
+            ),
+          ),
+          Text(
+            formatElapsed(DateTime.now().difference(activity.start)),
+            style: AppText.mono(size: 14, color: AppColors.textSecondary),
+          ),
+        ],
       ),
     );
   }

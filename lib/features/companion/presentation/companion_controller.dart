@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +20,50 @@ final companionRepositoryProvider = Provider<CompanionRepository>(
 final pairedDevicesProvider = StreamProvider<List<PairedDevice>>(
   (ref) => ref.watch(companionRepositoryProvider).watchDevices(),
 );
+
+/// External IDs of sessions in progress. Held in memory only: a session stops
+/// counting as live if its heartbeats stop, for example when a laptop sleeps.
+final liveSessionsProvider = NotifierProvider<LiveSessions, Set<String>>(
+  LiveSessions.new,
+);
+
+class LiveSessions extends Notifier<Set<String>> {
+  static const _heartbeatTimeout = Duration(seconds: 40);
+
+  final _lastBeat = <String, DateTime>{};
+  Timer? _pruner;
+
+  @override
+  Set<String> build() {
+    ref.onDispose(() => _pruner?.cancel());
+    return const {};
+  }
+
+  void report(Set<String> working, Set<String> finished) {
+    final now = DateTime.now();
+    for (final id in working) {
+      _lastBeat[id] = now;
+    }
+    finished.forEach(_lastBeat.remove);
+    _publish();
+    _pruner ??= Timer.periodic(const Duration(seconds: 5), (_) => _prune());
+  }
+
+  void _prune() {
+    final oldest = DateTime.now().subtract(_heartbeatTimeout);
+    _lastBeat.removeWhere((_, beat) => beat.isBefore(oldest));
+    _publish();
+    if (_lastBeat.isEmpty) {
+      _pruner?.cancel();
+      _pruner = null;
+    }
+  }
+
+  void _publish() {
+    final ids = _lastBeat.keys.toSet();
+    if (ids.length != state.length || !ids.containsAll(state)) state = ids;
+  }
+}
 
 class CompanionState {
   const CompanionState({this.offer, this.portBusy = false});
@@ -43,6 +88,11 @@ class CompanionController extends Notifier<CompanionState> {
     ref.read(companionRepositoryProvider),
     onPaired: () {
       if (ref.mounted) state = CompanionState(portBusy: state.portBusy);
+    },
+    onLive: (working, finished) {
+      if (ref.mounted) {
+        ref.read(liveSessionsProvider.notifier).report(working, finished);
+      }
     },
   );
 

@@ -9,7 +9,9 @@ const protocol = require('./protocol');
 const queue = require('./queue');
 const { Tracker, parseRepository } = require('./tracker');
 
-const FLUSH_EVERY_MS = 30 * 1000;
+const FLUSH_EVERY_MS = 15 * 1000;
+// Counts as live on the phone if there was activity this recently.
+const WORKING_WITHIN_MS = 60 * 1000;
 const TRACKED_SCHEMES = new Set(['file', 'vscode-remote', 'vscode-vfs']);
 
 let tracker;
@@ -68,7 +70,10 @@ async function flush() {
       queue.save(sessionId, tracker.snapshot());
       return;
     }
-    const batch = tracker.batch();
+    const now = Date.now();
+    const batch = tracker
+      .batch()
+      .map((s) => ({ ...s, working: now - s.end < WORKING_WITHIN_MS }));
     if (batch.length > 0) {
       const result = await protocol.sendSegments(config, batch);
       if (result === 'sent') {

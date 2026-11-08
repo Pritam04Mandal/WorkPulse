@@ -2,7 +2,7 @@
   "name": "workpulse",
   "displayName": "WorkPulse",
   "description": "Sends your VS Code coding time to the WorkPulse app on your phone. Times and project names only.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "workpulse",
   "private": true,
   "engines": {

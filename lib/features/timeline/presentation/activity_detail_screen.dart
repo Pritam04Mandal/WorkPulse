@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/domain/enums.dart';
 import '../../../core/format/durations.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/detail_widgets.dart';
@@ -150,7 +151,9 @@ class ActivityDetailScreen extends ConsumerWidget {
               if (activity.application != null)
                 ('Application', activity.application!, true),
               ('Project', 'No project', false),
-              if (activity.mergedEvents > 1)
+              if (activity.kind == ActivityKind.aiSession)
+                ('Prompts', '${activity.mergedEvents}', true)
+              else if (activity.mergedEvents > 1)
                 ('Merged from', '${activity.mergedEvents} focus events', false),
               (
                 'Recorded',

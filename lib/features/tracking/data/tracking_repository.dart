@@ -252,6 +252,7 @@ class TrackingRepository {
     title: row.title,
     start: row.startedAt,
     end: row.endedAt,
+    externalId: row.externalId,
     application: row.application,
     repository: row.domain,
     projectId: row.projectId,

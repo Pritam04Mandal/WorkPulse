@@ -9,6 +9,8 @@ class ClaudeSegment {
     required this.endMs,
     this.repository,
     this.source = SegmentSource.claudeCode,
+    this.prompts = 0,
+    this.working = false,
   });
 
   final String id;
@@ -17,6 +19,10 @@ class ClaudeSegment {
   final int endMs;
   final String? repository;
   final SegmentSource source;
+  final int prompts;
+
+  /// The computer says work is happening right now.
+  final bool working;
 
   static final _idPattern = RegExp(r'^[A-Za-z0-9_.:-]{1,120}$');
   static const _longest = Duration(hours: 24);
@@ -53,6 +59,11 @@ class ClaudeSegment {
         endMs: end,
         repository: repository as String?,
         source: source,
+        prompts: switch (raw['prompts']) {
+          final int n when n >= 0 && n < 1000000 => n,
+          _ => 0,
+        },
+        working: raw['working'] == true,
       );
     }
     return null;

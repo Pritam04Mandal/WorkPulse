@@ -119,6 +119,12 @@ void main() {
     expect(formatDuration(const Duration(minutes: 65)), '1h 05m');
     expect(formatDuration(const Duration(minutes: 40)), '40m');
     expect(formatDuration(null), '—');
+    expect(formatElapsed(const Duration(seconds: 7)), '7s');
+    expect(formatElapsed(const Duration(seconds: 493)), '8m 13s');
+    expect(
+      formatElapsed(const Duration(minutes: 65, seconds: 2)),
+      '1h 05m 02s',
+    );
     expect(formatDuration(const Duration(seconds: 20)), '<1m');
     expect(formatDuration(Duration.zero), '0m');
   });

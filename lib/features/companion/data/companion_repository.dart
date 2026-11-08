@@ -49,14 +49,22 @@ class CompanionRepository {
   }
 
   /// Saves segments from a paired computer. A segment that already exists is
-  /// extended, which is what makes a running session update live.
-  Future<void> ingest(String deviceId, List<ClaudeSegment> segments) async {
+  /// extended, which is what makes a running session update live. Returns
+  /// which sessions are in progress and which have just finished.
+  Future<({Set<String> working, Set<String> finished})> ingest(
+    String deviceId,
+    List<ClaudeSegment> segments,
+  ) async {
+    final working = <String>{};
+    final finished = <String>{};
     final now = _clock();
     await (_db.update(_db.pairedDevices)..where((t) => t.id.equals(deviceId)))
         .write(PairedDevicesCompanion(lastSeenAt: Value(now)));
 
     // Accepted, then dropped, so the computer doesn't keep retrying them.
-    if (await _db.readSetting(privateSessionSettingKey) == 'true') return;
+    if (await _db.readSetting(privateSessionSettingKey) == 'true') {
+      return (working: working, finished: finished);
+    }
 
     final source = await _ensureSource();
     final floor =
@@ -74,7 +82,11 @@ class CompanionRepository {
         if (segment.startMs < floor || tombstones.contains(externalId)) {
           continue;
         }
+        (segment.working ? working : finished).add(externalId);
         final isVsCode = segment.source == SegmentSource.vscode;
+        final prompts = segment.prompts > 0
+            ? Value(segment.prompts)
+            : const Value<int>.absent();
         final end = DateTime.fromMillisecondsSinceEpoch(segment.endMs);
         await _db
             .into(_db.activityEvents)
@@ -96,20 +108,25 @@ class CompanionRepository {
                 domain: Value(segment.repository),
                 startedAt: DateTime.fromMillisecondsSinceEpoch(segment.startMs),
                 endedAt: Value(end),
+                mergedEventCount: prompts,
               ),
               onConflict: DoUpdate(
-                (_) => ActivityEventsCompanion(endedAt: Value(end)),
+                (_) => ActivityEventsCompanion(
+                  endedAt: Value(end),
+                  mergedEventCount: prompts,
+                ),
                 target: [
                   _db.activityEvents.sourceId,
                   _db.activityEvents.externalId,
                 ],
                 where: (old) =>
                     old.isCorrected.equals(false) &
-                    old.endedAt.isSmallerThanValue(end),
+                    old.endedAt.isSmallerOrEqualValue(end),
               ),
             );
       }
     });
+    return (working: working, finished: finished);
   }
 
   /// Removes a computer. With [keepEvents] false, its sessions go too.
