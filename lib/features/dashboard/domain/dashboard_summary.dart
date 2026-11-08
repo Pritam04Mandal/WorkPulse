@@ -140,7 +140,11 @@ DashboardSummary buildDashboardSummary(
   for (final activity in visible.where(
     (a) => a.category == ActivityCategory.ai,
   )) {
-    aiCounts.update(activity.title, (n) => n + 1, ifAbsent: () => 1);
+    aiCounts.update(
+      activity.title.split(' · ').first,
+      (n) => n + 1,
+      ifAbsent: () => 1,
+    );
   }
   final aiSessions = aiCounts.values.fold(0, (sum, n) => sum + n);
 

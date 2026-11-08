@@ -11,6 +11,7 @@ import 'package:workpulse/features/auth/data/auth_repository_impl.dart';
 import 'package:workpulse/features/auth/domain/auth_contracts.dart';
 import 'package:workpulse/features/auth/domain/auth_models.dart';
 import 'package:workpulse/features/auth/presentation/session_controller.dart';
+import 'package:workpulse/features/companion/presentation/companion_controller.dart';
 import 'package:workpulse/features/github/presentation/github_controller.dart';
 import 'package:workpulse/features/tracking/data/usage_gateway.dart';
 import 'package:workpulse/features/tracking/domain/usage_models.dart';
@@ -68,6 +69,20 @@ class _IdleTracking extends TrackingController {
   Future<void> refresh() async {}
 }
 
+class _IdleCompanion extends CompanionController {
+  @override
+  Future<void> resume() async {}
+
+  @override
+  Future<void> pause() async {}
+
+  @override
+  Future<void> beginPairing() async {}
+
+  @override
+  void cancelPairing() {}
+}
+
 class _IdleGitHub extends GitHubSync {
   @override
   Future<void> refresh({bool force = false}) async {}
@@ -123,6 +138,7 @@ void main() {
           databaseProvider.overrideWithValue(db),
           trackingControllerProvider.overrideWith(_IdleTracking.new),
           githubSyncProvider.overrideWith(_IdleGitHub.new),
+          companionControllerProvider.overrideWith(_IdleCompanion.new),
           authRepositoryProvider.overrideWithValue(
             AuthRepositoryImpl(
               database: db,

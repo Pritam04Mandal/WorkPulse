@@ -72,8 +72,11 @@ class TrackedActivity {
 
   Duration? get duration => end?.difference(start);
 
-  String get sourceLabel =>
-      kind == ActivityKind.appUsage ? 'Android usage' : 'GitHub';
+  String get sourceLabel => switch (kind) {
+    ActivityKind.appUsage => 'Android usage',
+    ActivityKind.aiSession => 'Claude Code',
+    _ => 'GitHub',
+  };
 }
 
 DateTime startOfDay(DateTime time) => DateTime(time.year, time.month, time.day);

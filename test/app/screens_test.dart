@@ -13,6 +13,8 @@ import 'package:workpulse/features/auth/data/auth_repository_impl.dart';
 import 'package:workpulse/features/auth/domain/auth_contracts.dart';
 import 'package:workpulse/features/auth/domain/auth_models.dart';
 import 'package:workpulse/features/auth/presentation/session_controller.dart';
+import 'package:workpulse/features/companion/presentation/companion_controller.dart';
+import 'package:workpulse/features/companion/data/companion_secrets.dart';
 import 'package:workpulse/features/github/presentation/github_controller.dart';
 import 'package:workpulse/features/github/data/github_token_store.dart';
 import 'package:workpulse/features/tracking/data/usage_gateway.dart';
@@ -92,6 +94,34 @@ class _MemoryGitHubTokens implements GitHubTokenStore {
   Future<void> clear() async => token = null;
 }
 
+class _MemorySecrets implements CompanionSecrets {
+  @override
+  Future<void> clear() async {}
+
+  @override
+  Future<void> delete(String deviceId) async {}
+
+  @override
+  Future<String?> read(String deviceId) async => null;
+
+  @override
+  Future<void> save(String deviceId, String secret) async {}
+}
+
+class _IdleCompanion extends CompanionController {
+  @override
+  Future<void> resume() async {}
+
+  @override
+  Future<void> pause() async {}
+
+  @override
+  Future<void> beginPairing() async {}
+
+  @override
+  void cancelPairing() {}
+}
+
 class _IdleGitHub extends GitHubSync {
   @override
   Future<void> refresh({bool force = false}) async {}
@@ -131,7 +161,9 @@ void main() {
         databaseProvider.overrideWithValue(db),
         trackingControllerProvider.overrideWith(_IdleTracking.new),
         githubSyncProvider.overrideWith(_IdleGitHub.new),
+        companionControllerProvider.overrideWith(_IdleCompanion.new),
         githubTokenStoreProvider.overrideWithValue(_MemoryGitHubTokens()),
+        companionSecretsProvider.overrideWithValue(_MemorySecrets()),
         authRepositoryProvider.overrideWithValue(repository),
         usageAccessGatewayProvider.overrideWithValue(_Gateway()),
         initialSessionProvider.overrideWithValue(
@@ -194,6 +226,7 @@ void main() {
 
   for (final (route, expected) in const [
     ('/home', 'Today'),
+    ('/integrations/claude', 'Claude Code'),
     ('/integrations/github', 'Not connected'),
     ('/integrations/github/connect', 'isn’t configured'),
     ('/timeline', 'Timeline'),

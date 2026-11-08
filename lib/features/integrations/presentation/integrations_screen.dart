@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/detail_widgets.dart';
+import '../../companion/presentation/companion_controller.dart';
 import '../../github/presentation/github_controller.dart';
 import '../../tracking/presentation/tracking_controller.dart';
 
@@ -60,6 +61,7 @@ class IntegrationsScreen extends ConsumerWidget {
     final github = ref.watch(githubStatusProvider).value;
     final githubOn = github?.connected ?? false;
     final synced = github?.lastSyncedAt;
+    final claude = ref.watch(pairedDevicesProvider).value ?? const [];
     final items = [
       (
         mono: 'A',
@@ -85,6 +87,16 @@ class IntegrationsScreen extends ConsumerWidget {
         route:
             (githubOn ? '/integrations/github' : '/integrations/github/connect')
                 as String?,
+      ),
+      (
+        mono: 'CC',
+        name: 'Claude Code',
+        detail: claude.isEmpty
+            ? 'Session times from your computer'
+            : claude.map((d) => d.name).join(', '),
+        status: claude.isEmpty ? 'Add' : 'Paired',
+        color: claude.isEmpty ? AppColors.coding : AppColors.accent,
+        route: '/integrations/claude' as String?,
       ),
       ..._otherItems,
     ];

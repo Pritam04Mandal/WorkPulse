@@ -78,7 +78,7 @@ class PairedDevices extends Table with UuidPrimaryKey {
   TextColumn get kind => textEnum<DeviceKind>()();
   TextColumn get name => text()();
 
-  /// Public key that verifies events signed by this device.
+  /// Identifies this device's signing key. The key is in secure storage.
   TextColumn get publicKey => text()();
   DateTimeColumn get pairedAt => dateTime()();
   DateTimeColumn get lastSeenAt => dateTime().nullable()();

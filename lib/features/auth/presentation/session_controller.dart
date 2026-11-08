@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/setting_keys.dart';
 import '../../../core/domain/enums.dart';
+import '../../companion/data/companion_secrets.dart';
 import '../../github/data/github_token_store.dart';
 import '../domain/auth_contracts.dart';
 import '../domain/auth_models.dart';
@@ -86,6 +87,7 @@ class SessionController extends Notifier<Session> {
   Future<void> deleteAllData() async {
     await _repository.deleteAllLocalData();
     await ref.read(githubTokenStoreProvider).clear();
+    await ref.read(companionSecretsProvider).clear();
     await _holdUsageImportsUntilNow();
   }
 

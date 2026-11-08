@@ -6,6 +6,7 @@ import '../core/domain/enums.dart';
 import '../features/auth/presentation/session_controller.dart';
 import '../features/dashboard/presentation/dashboard_screen.dart';
 import '../features/insights/presentation/insights_screen.dart';
+import '../features/integrations/presentation/claude_code_screen.dart';
 import '../features/integrations/presentation/github_connect_screen.dart';
 import '../features/integrations/presentation/integrations_screen.dart';
 import '../features/integrations/presentation/pair_device_screen.dart';
@@ -112,6 +113,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                 builder: (context, state) => const GitHubConnectScreen(),
               ),
             ],
+          ),
+          GoRoute(
+            path: 'claude',
+            builder: (context, state) => const ClaudeCodeScreen(),
           ),
           GoRoute(
             path: 'teams',

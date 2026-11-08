@@ -18,6 +18,14 @@ connects with Device Flow and syncs commits, pull requests, reviews and issues.
 The database tables other than `users` were derived from the design canvas,
 because the original spec's §6 was not available. See `lib/core/database/tables.dart`.
 
+## Claude Code
+
+`companion/claude-code/workpulse_claude.py` reports Claude Code session times
+to the phone over the local network. It needs only Python 3.8+. Open
+**Integrations → Claude Code** in the app for the pairing commands. Sessions
+send only times, the folder name and the repository name; events are signed
+but not encrypted on the local network.
+
 ## Layout
 
 ```
