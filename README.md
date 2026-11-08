@@ -8,10 +8,11 @@ Build notes: [build-handoff.md](build-handoff.md)
 
 ## Status
 
-Every design screen is built. Onboarding, sign-in, Profile, sign-out and
-Delete all data are real. Everything marked `SAMPLE DATA` uses in-memory
-examples until the integrations land: Android usage tracking first, then
-GitHub, Teams and the paired devices.
+Every design screen is built. Android usage tracking drives Home, Timeline,
+Activity detail and app exclusions, and it catches up from Android's usage log
+each time the app opens. Onboarding, sign-in, Profile, sign-out, Private
+session and Delete all data are also real. Everything marked `SAMPLE DATA`
+uses in-memory examples until GitHub, Teams and the paired devices land.
 
 The database tables other than `users` were derived from the design canvas,
 because the original spec's §6 was not available. See `lib/core/database/tables.dart`.

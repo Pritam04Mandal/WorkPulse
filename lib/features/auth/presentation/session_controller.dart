@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/database/setting_keys.dart';
 import '../../../core/domain/enums.dart';
 import '../domain/auth_contracts.dart';
 import '../domain/auth_models.dart';
@@ -75,12 +76,25 @@ class SessionController extends Notifier<Session> {
     await ref
         .read(databaseProvider)
         .deleteSetting(onboardingCompleteSettingKey);
+    await _holdUsageImportsUntilNow();
     state = const Session();
   }
 
   /// Wipes the device. Leaves [state] alone so the confirmation can show;
   /// call [startOver] afterwards.
-  Future<void> deleteAllData() => _repository.deleteAllLocalData();
+  Future<void> deleteAllData() async {
+    await _repository.deleteAllLocalData();
+    await _holdUsageImportsUntilNow();
+  }
+
+  /// Android keeps its usage log, so without this the next sync would bring
+  /// back activity from before a sign-out or a wipe.
+  Future<void> _holdUsageImportsUntilNow() => ref
+      .read(databaseProvider)
+      .writeSetting(
+        importFloorSettingKey,
+        '${DateTime.now().millisecondsSinceEpoch}',
+      );
 
   void startOver() => state = const Session();
 

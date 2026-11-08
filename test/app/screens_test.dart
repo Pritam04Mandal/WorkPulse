@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,12 +7,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:workpulse/app/app.dart';
 import 'package:workpulse/app/router.dart';
 import 'package:workpulse/core/database/app_database.dart';
+import 'package:workpulse/core/database/setting_keys.dart';
 import 'package:workpulse/core/domain/enums.dart';
 import 'package:workpulse/features/auth/data/auth_repository_impl.dart';
 import 'package:workpulse/features/auth/domain/auth_contracts.dart';
 import 'package:workpulse/features/auth/domain/auth_models.dart';
 import 'package:workpulse/features/auth/presentation/session_controller.dart';
-import 'package:workpulse/features/onboarding/data/usage_access_gateway.dart';
+import 'package:workpulse/features/tracking/data/usage_gateway.dart';
+import 'package:workpulse/features/tracking/domain/usage_models.dart';
+import 'package:workpulse/features/tracking/presentation/tracking_controller.dart';
 import 'package:workpulse/features/settings/presentation/profile_screen.dart';
 
 class _NullTokens implements TokenStore {
@@ -30,6 +34,20 @@ class _Gateway implements UsageAccessGateway {
 
   @override
   Future<void> openSettings() async {}
+
+  @override
+  Future<List<RawUsageEvent>> queryEvents(int startMs, int endMs) async => [];
+
+  @override
+  Future<Map<String, String>> appLabels(List<String> packages) async => {};
+
+  @override
+  Future<List<InstalledApp>> launchableApps() async => const [
+    InstalledApp('com.android.chrome', 'Chrome'),
+  ];
+
+  @override
+  Future<Set<String>> homePackages() async => {};
 }
 
 class _FakeProvider implements IdentityProvider {
@@ -50,6 +68,13 @@ class _FakeProvider implements IdentityProvider {
 Future<void> _loadFont(String family, String asset) async {
   final loader = FontLoader(family)..addFont(rootBundle.load(asset));
   await loader.load();
+}
+
+/// The real sync is covered by the repository tests. Here it would run inside
+/// the widget test's fake clock and never finish.
+class _IdleTracking extends TrackingController {
+  @override
+  Future<void> refresh() async {}
 }
 
 void main() {
@@ -78,6 +103,7 @@ void main() {
     container = ProviderContainer(
       overrides: [
         databaseProvider.overrideWithValue(db),
+        trackingControllerProvider.overrideWith(_IdleTracking.new),
         authRepositoryProvider.overrideWithValue(repository),
         usageAccessGatewayProvider.overrideWithValue(_Gateway()),
         initialSessionProvider.overrideWithValue(
@@ -105,25 +131,22 @@ void main() {
   Future<void> finish(WidgetTester tester) async {
     await tester.pumpWidget(const SizedBox());
     container.dispose();
-    await db.close();
-    await tester.pump(Duration.zero);
+    // Drift finishes through timers, which only run when the fake clock moves.
+    final closing = db.close();
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await closing;
   }
 
   final sampleRoutes = <String, String>{
-    '/home': 'Today',
-    '/timeline': 'Timeline',
     '/projects': 'Projects',
     '/insights': 'Insights',
-    '/settings': 'Settings',
-    '/activity/vscode': 'VS Code',
-    '/activity/commit': 'Commit · Add drift migrations',
-    '/activity/private': 'Private session',
     '/projects/workpulse-app': 'workpulse-app',
     '/projects/client-meetings': 'Client meetings',
     '/projects/new': 'New project',
     '/projects/billing-api/edit': 'Edit project',
     '/home/journal': 'Main projects',
-    '/settings/exclusions': 'Exclusions',
     '/integrations': 'Integrations',
     '/integrations/github': 'Connected as @sample-dev',
     '/integrations/github/connect': 'Connect GitHub',
@@ -144,6 +167,10 @@ void main() {
   }
 
   for (final (route, expected) in const [
+    ('/home', 'Today'),
+    ('/timeline', 'Timeline'),
+    ('/settings', 'Settings'),
+    ('/settings/exclusions', 'Chrome'),
     ('/settings/profile', 'Local profile'),
     ('/settings/delete-data', 'Delete all data'),
     ('/integrations/add-git', 'Add Git instance'),
@@ -159,19 +186,44 @@ void main() {
     });
   }
 
-  testWidgets('timeline filters and day navigation', (tester) async {
+  testWidgets('the timeline shows real events and filters them', (
+    tester,
+  ) async {
     await pumpApp(tester);
+    await tester.runAsync(() async {
+      final source = await db
+          .into(db.dataSources)
+          .insertReturning(
+            DataSourcesCompanion.insert(
+              kind: SourceKind.androidUsage,
+              status: SourceStatus.connected,
+              connectedAt: DateTime.now(),
+            ),
+          );
+      final now = DateTime.now();
+      await db
+          .into(db.activityEvents)
+          .insert(
+            ActivityEventsCompanion.insert(
+              sourceId: source.id,
+              kind: ActivityKind.appUsage,
+              category: ActivityCategory.other,
+              title: 'Chrome',
+              startedAt: DateTime(now.year, now.month, now.day),
+              endedAt: Value(DateTime(now.year, now.month, now.day, 0, 20)),
+            ),
+          );
+    });
     container.read(routerProvider).go('/timeline');
     await settle(tester);
+    await settle(tester);
 
-    expect(find.text('VS Code'), findsOneWidget);
+    expect(find.text('Chrome'), findsOneWidget);
+    expect(find.text('SAMPLE DATA'), findsNothing);
+
     await tester.tap(find.text('AI'));
     await tester.pump();
-    expect(find.text('VS Code'), findsNothing);
-    expect(find.text('Claude session'), findsOneWidget);
-
-    await tester.tap(find.byTooltip('Previous day'));
-    await tester.pump();
+    expect(find.text('Chrome'), findsNothing);
     expect(find.text('Nothing recorded'), findsOneWidget);
     await finish(tester);
   });
@@ -227,6 +279,7 @@ void main() {
     await tester.runAsync(() async {
       expect(await db.select(db.users).get(), isEmpty);
       expect(await db.readSetting(onboardingCompleteSettingKey), isNull);
+      expect(await db.readSetting(importFloorSettingKey), isNotNull);
     });
 
     await tester.tap(find.text('Start over'));

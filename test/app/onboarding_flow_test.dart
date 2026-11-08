@@ -7,13 +7,13 @@ import 'package:workpulse/app/router.dart';
 import 'package:workpulse/core/database/app_database.dart';
 import 'package:workpulse/core/domain/enums.dart';
 import 'package:workpulse/core/format/durations.dart';
-import 'package:workpulse/core/theme/tokens.dart';
 import 'package:workpulse/features/auth/data/auth_repository_impl.dart';
 import 'package:workpulse/features/auth/domain/auth_contracts.dart';
 import 'package:workpulse/features/auth/domain/auth_models.dart';
 import 'package:workpulse/features/auth/presentation/session_controller.dart';
-import 'package:workpulse/features/dashboard/data/sample_dashboard.dart';
-import 'package:workpulse/features/onboarding/data/usage_access_gateway.dart';
+import 'package:workpulse/features/tracking/data/usage_gateway.dart';
+import 'package:workpulse/features/tracking/domain/usage_models.dart';
+import 'package:workpulse/features/tracking/presentation/tracking_controller.dart';
 
 class _NullTokens implements TokenStore {
   @override
@@ -44,6 +44,27 @@ class _DeniedUsageAccess implements UsageAccessGateway {
 
   @override
   Future<void> openSettings() async {}
+
+  @override
+  Future<List<RawUsageEvent>> queryEvents(int startMs, int endMs) async => [];
+
+  @override
+  Future<Map<String, String>> appLabels(List<String> packages) async => {};
+
+  @override
+  Future<List<InstalledApp>> launchableApps() async => const [
+    InstalledApp('com.android.chrome', 'Chrome'),
+  ];
+
+  @override
+  Future<Set<String>> homePackages() async => {};
+}
+
+/// The real sync is covered by the repository tests. Here it would run inside
+/// the widget test's fake clock and never finish.
+class _IdleTracking extends TrackingController {
+  @override
+  Future<void> refresh() async {}
 }
 
 void main() {
@@ -71,10 +92,8 @@ void main() {
     expect(formatDuration(const Duration(minutes: 65)), '1h 05m');
     expect(formatDuration(const Duration(minutes: 40)), '40m');
     expect(formatDuration(null), '—');
-  });
-
-  test('sample categories add up to the design total', () {
-    expect(formatDuration(sampleDashboard.activeTime), '5h 42m');
+    expect(formatDuration(const Duration(seconds: 20)), '<1m');
+    expect(formatDuration(Duration.zero), '0m');
   });
 
   group('app', () {
@@ -90,6 +109,7 @@ void main() {
       container = ProviderContainer(
         overrides: [
           databaseProvider.overrideWithValue(db),
+          trackingControllerProvider.overrideWith(_IdleTracking.new),
           authRepositoryProvider.overrideWithValue(
             AuthRepositoryImpl(
               database: db,
@@ -115,8 +135,12 @@ void main() {
     Future<void> tearDownApp(WidgetTester tester) async {
       await tester.pumpWidget(const SizedBox());
       container.dispose();
-      await db.close();
-      await tester.pump(Duration.zero);
+      // Drift finishes through timers, which only run when the fake clock moves.
+      final closing = db.close();
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      await closing;
     }
 
     Future<void> tapAndSettle(WidgetTester tester, String label) async {
@@ -127,7 +151,7 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('continuing without an account reaches a labelled dashboard', (
+    testWidgets('continuing without an account reaches the dashboard', (
       tester,
     ) async {
       await pumpApp(tester);
@@ -138,14 +162,10 @@ void main() {
 
       await tapAndSettle(tester, 'Not now');
       expect(find.text('Today'), findsOneWidget);
-      expect(find.text('SAMPLE DATA'), findsOneWidget);
-      expect(find.text('5h 42m'), findsOneWidget);
+      expect(find.text('SAMPLE DATA'), findsNothing);
+      expect(find.text('ACTIVE TRACKING'), findsOneWidget);
       expect(find.byType(NavigationBar), findsOneWidget);
       expect(find.text('Settings'), findsOneWidget);
-      final codingBar = find.byWidgetPredicate(
-        (w) => w is ColoredBox && w.color == AppColors.coding,
-      );
-      expect(tester.getSize(codingBar).height, 8);
 
       await tester.runAsync(() async {
         final users = await db.select(db.users).get();

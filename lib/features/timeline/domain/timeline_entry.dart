@@ -2,7 +2,7 @@ import 'package:flutter/material.dart' show TimeOfDay;
 
 import '../../../core/format/durations.dart';
 
-enum EntryKind { coding, meeting, ai, github, private, gap }
+enum EntryKind { coding, meeting, ai, github, other, private, gap }
 
 enum Attribution { inferred, observed, setByYou, unassigned, hidden }
 
@@ -31,6 +31,7 @@ class TimelineEntry {
     this.application,
     this.workspace,
     this.mergedFrom,
+    this.elapsed,
   });
 
   final String id;
@@ -52,9 +53,13 @@ class TimelineEntry {
   final String? workspace;
   final int? mergedFrom;
 
+  /// Exact length when known; [start] and [end] only have minute precision.
+  final Duration? elapsed;
+
   bool get isGap => kind == EntryKind.gap;
   bool get isInferred => attribution == Attribution.inferred;
-  Duration? get duration => end == null ? null : spanBetween(start, end!);
+  Duration? get duration =>
+      elapsed ?? (end == null ? null : spanBetween(start, end!));
   String get displayTitle =>
       isGap ? 'No activity recorded · ${formatDuration(duration)}' : title;
 }

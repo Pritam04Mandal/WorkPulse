@@ -8,12 +8,20 @@ import '../../../core/format/durations.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/app_widgets.dart';
 import '../../auth/presentation/session_controller.dart';
-import '../data/sample_dashboard.dart';
+import '../../tracking/domain/usage_models.dart';
+import '../../tracking/presentation/tracking_controller.dart';
 import '../domain/dashboard_summary.dart';
 
-final dashboardSummaryProvider = Provider<DashboardSummary>(
-  (ref) => sampleDashboard,
-);
+final dashboardSummaryProvider = Provider<DashboardSummary>((ref) {
+  final granted = ref.watch(
+    trackingControllerProvider.select((s) => s.usageGranted),
+  );
+  // Each sync re-evaluates "today", so the screen rolls over at midnight.
+  ref.watch(trackingControllerProvider.select((s) => s.lastSyncedAt));
+  final today = startOfDay(DateTime.now());
+  final activities = ref.watch(dayActivitiesProvider(today)).value ?? const [];
+  return buildDashboardSummary(activities, usageGranted: granted);
+});
 
 Color _categoryColor(ActivityCategory category) => switch (category) {
   ActivityCategory.coding => AppColors.coding,
@@ -27,6 +35,7 @@ Color _recentColor(RecentKind kind) => switch (kind) {
   RecentKind.ai => AppColors.ai,
   RecentKind.meeting => AppColors.meetings,
   RecentKind.github => AppColors.accent,
+  RecentKind.other => AppColors.muted,
 };
 
 String _route(DashboardDestination destination) => switch (destination) {
@@ -44,6 +53,7 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final summary = ref.watch(dashboardSummaryProvider);
+    final tracking = ref.watch(trackingControllerProvider);
     final user = ref.watch(sessionProvider.select((s) => s.user));
     final initial = (user?.name ?? 'Local').characters.first.toUpperCase();
     final text = Theme.of(context).textTheme;
@@ -67,8 +77,6 @@ class DashboardScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
-                if (summary.isSample) const SampleDataChip(),
-                const SizedBox(width: 8),
                 Semantics(
                   label: 'Profile',
                   button: true,
@@ -101,45 +109,55 @@ class DashboardScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 20),
+            if (!tracking.usageGranted) ...[
+              _Notice(
+                title: 'Usage Access is off',
+                body: 'WorkPulse can’t see app usage until you allow it.',
+                onTap: () => context.push('/usage-access'),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (tracking.privateSession) ...[
+              _Notice(
+                title: 'Private session is on',
+                body: 'Nothing is recorded until you turn it off.',
+                onTap: () => context.go('/settings'),
+              ),
+              const SizedBox(height: 12),
+            ],
             _ActiveTrackingCard(summary: summary),
             const SizedBox(height: 20),
-            AppCard(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              onTap: () => context.push('/activity/${summary.nowEntryId}'),
-              child: Row(
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: const BoxDecoration(
-                      color: AppColors.accent,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(color: AppColors.accentTint, spreadRadius: 4),
-                      ],
+            if (summary.latest != null) ...[
+              AppCard(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                onTap: () =>
+                    context.push('/activity/${summary.latest!.entryId}'),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Latest', style: AppText.caption),
+                          Text(summary.latest!.title, style: text.titleMedium),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Now', style: AppText.caption),
-                        Text(summary.nowLabel, style: text.titleMedium),
-                      ],
+                    Text(
+                      formatDuration(summary.latest!.duration),
+                      style: AppText.mono(
+                        size: 14,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
-                  ),
-                  Text(
-                    formatDuration(summary.nowDuration),
-                    style: AppText.mono(
-                      size: 14,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
+            ],
             for (var i = 0; i < summary.tiles.length; i += 2) ...[
               if (i > 0) const SizedBox(height: 12),
               IntrinsicHeight(
@@ -171,6 +189,11 @@ class DashboardScreen extends ConsumerWidget {
                 ),
               ],
             ),
+            if (summary.recent.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Text('Nothing recorded yet.', style: AppText.caption),
+              ),
             for (final item in summary.recent) _RecentRow(item: item),
             const SizedBox(height: 20),
             AppCard(
@@ -243,6 +266,37 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
+class _Notice extends StatelessWidget {
+  const _Notice({required this.title, required this.body, required this.onTap});
+
+  final String title;
+  final String body;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: AppColors.amberTint,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+      side: const BorderSide(color: AppColors.amberBorder),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            Text(body, style: AppText.caption),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class _ActiveTrackingCard extends StatelessWidget {
   const _ActiveTrackingCard({required this.summary});
 
@@ -279,7 +333,9 @@ class _ActiveTrackingCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               spacing: 2,
               children: [
-                for (final c in summary.categories)
+                for (final c in summary.categories.where(
+                  (c) => c.duration.inMinutes > 0,
+                ))
                   Expanded(
                     flex: c.duration.inMinutes,
                     child: ColoredBox(color: _categoryColor(c.category)),

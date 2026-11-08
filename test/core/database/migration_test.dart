@@ -65,8 +65,9 @@ void main() {
       return row.id;
     }
 
-    Future<void> addEvent(String source, {String? project, String? ext}) =>
-        db.into(db.activityEvents).insert(
+    Future<void> addEvent(String source, {String? project, String? ext}) => db
+        .into(db.activityEvents)
+        .insert(
           ActivityEventsCompanion.insert(
             sourceId: source,
             kind: ActivityKind.commit,

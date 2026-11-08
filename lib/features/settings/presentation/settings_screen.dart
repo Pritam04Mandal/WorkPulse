@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -7,77 +6,28 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/app_widgets.dart';
 import '../../../core/widgets/detail_widgets.dart';
 import '../../auth/presentation/session_controller.dart';
-import '../../onboarding/data/usage_access_gateway.dart';
-import '../data/sample_exclusions.dart';
+import '../../tracking/presentation/tracking_controller.dart';
 
-const privateSessionSettingKey = 'private_session';
-
-final _usageAccessProvider = FutureProvider.autoDispose<bool?>((ref) async {
-  try {
-    return await ref.watch(usageAccessGatewayProvider).isGranted();
-  } on PlatformException {
-    return null;
-  }
-});
-
-class SettingsScreen extends ConsumerStatefulWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  late final AppLifecycleListener _lifecycle;
-  var _private = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // Usage Access changes in Android settings, outside the app.
-    _lifecycle = AppLifecycleListener(
-      onResume: () => ref.invalidate(_usageAccessProvider),
-    );
-    _loadPrivate();
-  }
-
-  @override
-  void dispose() {
-    _lifecycle.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadPrivate() async {
-    final value = await ref
-        .read(databaseProvider)
-        .readSetting(privateSessionSettingKey);
-    if (mounted) setState(() => _private = value == 'true');
-  }
-
-  Future<void> _setPrivate(bool value) async {
-    setState(() => _private = value);
-    await ref
-        .read(databaseProvider)
-        .writeSetting(privateSessionSettingKey, '$value');
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(sessionProvider.select((s) => s.user));
-    final excluded = ref.watch(sampleExclusionsProvider);
-    final granted = ref.watch(_usageAccessProvider).value;
+    final tracking = ref.watch(trackingControllerProvider);
+    final excludedApps = ref.watch(excludedAppsProvider).value?.length ?? 0;
     final text = Theme.of(context).textTheme;
-    final name = user == null || user.isLocal
-        ? 'Local profile'
-        : user.name ?? user.email ?? 'Signed in';
     final isLocal = user == null || user.isLocal;
+    final name = isLocal
+        ? 'Local profile'
+        : user.name ?? user.email ?? 'Account';
 
     return Scaffold(
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           children: [
-            const TabHeader(title: 'Settings', trailing: [SampleDataChip()]),
+            const TabHeader(title: 'Settings'),
             const SizedBox(height: 8),
             AppCard(
               padding: const EdgeInsets.all(14),
@@ -124,34 +74,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SectionTitle('Tracking'),
             _SwitchRow(
               title: 'Private session',
-              hint: _private
+              hint: tracking.privateSession
                   ? 'On · nothing is recorded until you turn it off'
                   : 'Pause all collection for a while',
-              value: _private,
-              onChanged: _setPrivate,
+              value: tracking.privateSession,
+              onChanged: ref
+                  .read(trackingControllerProvider.notifier)
+                  .setPrivateSession,
             ),
             NavRow(
               title: 'Integrations',
-              value: '5 connected',
               onTap: () => context.push('/integrations'),
             ),
             NavRow(
               title: 'Excluded apps',
-              value: '${countExcluded(excluded, sampleExcludableApps)} apps',
+              value: '$excludedApps apps',
               onTap: () => context.push('/settings/exclusions'),
             ),
             NavRow(
               title: 'Excluded websites',
-              value: '${countExcluded(excluded, sampleExcludableSites)} sites',
               onTap: () => context.push('/settings/exclusions?tab=sites'),
             ),
             NavRow(
               title: 'Usage Access',
-              value: switch (granted) {
-                true => 'Granted',
-                false => 'Not granted',
-                null => null,
-              },
+              value: tracking.usageGranted ? 'Granted' : 'Not granted',
               onTap: () => context.push('/usage-access'),
             ),
             const SizedBox(height: 24),

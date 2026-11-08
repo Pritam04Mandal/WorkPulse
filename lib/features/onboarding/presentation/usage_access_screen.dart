@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/tokens.dart';
 import '../../auth/presentation/session_controller.dart';
-import '../data/usage_access_gateway.dart';
+import '../../tracking/data/usage_gateway.dart';
 
 class UsageAccessScreen extends ConsumerStatefulWidget {
   const UsageAccessScreen({super.key});

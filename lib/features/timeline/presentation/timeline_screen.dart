@@ -7,7 +7,9 @@ import '../../../core/format/durations.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/app_widgets.dart';
 import '../../../core/widgets/detail_widgets.dart';
-import '../data/sample_timeline.dart';
+import '../../tracking/domain/usage_models.dart';
+import '../../tracking/presentation/tracking_controller.dart';
+import '../domain/timeline_builder.dart';
 import '../domain/timeline_entry.dart';
 
 Color entryColor(EntryKind kind) => switch (kind) {
@@ -15,6 +17,7 @@ Color entryColor(EntryKind kind) => switch (kind) {
   EntryKind.meeting => AppColors.meetings,
   EntryKind.ai => AppColors.ai,
   EntryKind.github => AppColors.accent,
+  EntryKind.other => AppColors.muted,
   EntryKind.private => AppColors.other,
   EntryKind.gap => AppColors.borderStrong,
 };
@@ -27,20 +30,7 @@ const _filters = [
   (TimelineFilter.github, 'GitHub'),
 ];
 
-const _pastDays = [
-  (
-    sub: 'No tracked time',
-    empty:
-        'No apps were used for work, or tracking was paused. Weekends often '
-        'look like this.',
-  ),
-  (
-    sub: 'Usage Access was off',
-    empty:
-        'Android didn’t share usage data this day because the permission was '
-        'turned off.',
-  ),
-];
+const _maxDaysBack = 30;
 
 class TimelineScreen extends ConsumerStatefulWidget {
   const TimelineScreen({super.key});
@@ -53,30 +43,36 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
   var _filter = TimelineFilter.all;
   var _dayOffset = 0;
 
-  String _dayLabel() {
-    final day = DateTime.now().subtract(Duration(days: _dayOffset));
+  String _dayLabel(DateTime day) {
     final date = DateFormat('d MMM').format(day);
     return _dayOffset == 0
         ? 'Today, $date'
         : '${DateFormat('EEE').format(day)}, $date';
   }
 
+  String _emptyMessage(TrackingState tracking, bool hasEntries) {
+    if (hasEntries) return 'Nothing matches this filter on the selected day.';
+    if (_dayOffset == 0 && !tracking.usageGranted) {
+      return 'Android isn’t sharing usage data because the permission is off.';
+    }
+    if (_dayOffset == 0 && tracking.privateSession) {
+      return 'A private session is on, so nothing is being recorded.';
+    }
+    return 'No apps were recorded on this day, or tracking was paused.';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final entries = ref.watch(sampleTimelineProvider);
-    final past = _dayOffset == 0 ? null : _pastDays[_dayOffset - 1];
-    final tracked = entries
-        .where((e) => !e.isGap && e.duration != null)
-        .fold(Duration.zero, (sum, e) => sum + e.duration!);
-    final gaps = entries
-        .where((e) => e.isGap)
-        .fold(Duration.zero, (sum, e) => sum + e.duration!);
-    final daySub =
-        past?.sub ??
-        '${formatDuration(tracked)} tracked · ${formatDuration(gaps)} gaps';
-    final rows = past == null
-        ? filterEntries(entries, _filter)
-        : const <TimelineEntry>[];
+    final tracking = ref.watch(trackingControllerProvider);
+    final today = startOfDay(DateTime.now());
+    final day = DateTime(today.year, today.month, today.day - _dayOffset);
+    final activities = ref.watch(dayActivitiesProvider(day)).value ?? const [];
+    final entries = buildTimelineEntries(activities);
+    final rows = filterEntries(entries, _filter);
+    final daySub = entries.isEmpty
+        ? 'No tracked time'
+        : '${formatDuration(trackedTime(entries))} tracked · '
+              '${formatDuration(gapTime(entries))} gaps';
 
     return Scaffold(
       body: SafeArea(
@@ -85,7 +81,7 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
           children: [
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: TabHeader(title: 'Timeline', trailing: [SampleDataChip()]),
+              child: TabHeader(title: 'Timeline'),
             ),
             const SizedBox(height: 14),
             Padding(
@@ -95,7 +91,7 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
                   IconButton(
                     tooltip: 'Previous day',
                     color: AppColors.textSecondary,
-                    onPressed: _dayOffset < _pastDays.length
+                    onPressed: _dayOffset < _maxDaysBack
                         ? () => setState(() => _dayOffset++)
                         : null,
                     icon: const Icon(Icons.chevron_left),
@@ -105,7 +101,7 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
                       spacing: 2,
                       children: [
                         Text(
-                          _dayLabel(),
+                          _dayLabel(day),
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                         Text(
@@ -149,15 +145,13 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
             Expanded(
               child: rows.isEmpty
                   ? _EmptyDay(
-                      message:
-                          past?.empty ??
-                          'Nothing matches this filter on the selected day.',
+                      message: _emptyMessage(tracking, entries.isNotEmpty),
                     )
-                  : ListView(
+                  : ListView.builder(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                      children: [
-                        for (final entry in rows) _TimelineRow(entry: entry),
-                      ],
+                      itemCount: rows.length,
+                      itemBuilder: (context, index) =>
+                          _TimelineRow(entry: rows[index]),
                     ),
             ),
           ],
@@ -208,9 +202,6 @@ class _Dot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = entryColor(entry.kind);
-    final outlined =
-        entry.isInferred || entry.attribution == Attribution.unassigned;
     if (entry.isGap) {
       return Container(
         width: 8,
@@ -221,13 +212,14 @@ class _Dot extends StatelessWidget {
         ),
       );
     }
+    final color = entryColor(entry.kind);
     return Container(
       width: 10,
       height: 10,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: outlined ? null : color,
-        border: outlined ? Border.all(color: color, width: 2) : null,
+        color: entry.isInferred ? null : color,
+        border: entry.isInferred ? Border.all(color: color, width: 2) : null,
       ),
     );
   }
@@ -239,103 +231,89 @@ class _TimelineRow extends StatelessWidget {
   final TimelineEntry entry;
 
   @override
-  Widget build(BuildContext context) {
-    final amberTag =
-        entry.isInferred || entry.attribution == Attribution.unassigned;
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            width: 44,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 14),
-              child: Text(
-                clockLabel(entry.start),
-                style: AppText.mono(color: AppColors.muted),
-              ),
+  Widget build(BuildContext context) => IntrinsicHeight(
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          width: 44,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 14),
+            child: Text(
+              clockLabel(entry.start),
+              style: AppText.mono(color: AppColors.muted),
             ),
           ),
-          const SizedBox(width: 6),
-          SizedBox(
-            width: 16,
-            child: Column(
-              children: [
-                Container(width: 2, height: 14, color: AppColors.border),
-                _Dot(entry: entry),
-                Expanded(child: Container(width: 2, color: AppColors.border)),
-              ],
-            ),
+        ),
+        const SizedBox(width: 6),
+        SizedBox(
+          width: 16,
+          child: Column(
+            children: [
+              Container(width: 2, height: 14, color: AppColors.border),
+              _Dot(entry: entry),
+              Expanded(child: Container(width: 2, color: AppColors.border)),
+            ],
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: entry.isGap
-                ? Padding(
-                    padding: const EdgeInsets.fromLTRB(0, 12, 0, 14),
-                    child: Text(
-                      entry.displayTitle,
-                      style: AppText.caption.copyWith(
-                        fontSize: 13,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  )
-                : Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: AppCard(
-                      color: AppColors.surface,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      onTap: () => context.push('/activity/${entry.id}'),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        spacing: 6,
-                        children: [
-                          Row(
-                            spacing: 8,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  entry.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                formatDuration(entry.duration),
-                                style: AppText.mono(
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Text.rich(
-                            TextSpan(
-                              style: AppText.caption,
-                              children: [
-                                TextSpan(text: '${entry.source} · '),
-                                TextSpan(
-                                  text: entry.tag,
-                                  style: amberTag
-                                      ? const TextStyle(color: AppColors.amber)
-                                      : null,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: entry.isGap
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 12, 0, 14),
+                  child: Text(
+                    entry.displayTitle,
+                    style: AppText.caption.copyWith(
+                      fontSize: 13,
+                      fontStyle: FontStyle.italic,
                     ),
                   ),
-          ),
-        ],
-      ),
-    );
-  }
+                )
+              : Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: AppCard(
+                    color: AppColors.surface,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    onTap: () => context.push('/activity/${entry.id}'),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      spacing: 6,
+                      children: [
+                        Row(
+                          spacing: 8,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                entry.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              formatDuration(entry.duration),
+                              style: AppText.mono(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          '${entry.source} · ${entry.tag}',
+                          style: AppText.caption,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+        ),
+      ],
+    ),
+  );
 }
