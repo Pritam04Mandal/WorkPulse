@@ -40,7 +40,8 @@ class MainActivity : FlutterActivity() {
                             .sortedBy { it.getValue("label").lowercase() }
                     }
                     "homePackages" -> inBackground(result) {
-                        packagesFor(Intent.CATEGORY_HOME).toList()
+                        // Settings registers a fallback home screen but is a real app.
+                        (packagesFor(Intent.CATEGORY_HOME) - "com.android.settings").toList()
                     }
                     else -> result.notImplemented()
                 }
