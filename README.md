@@ -67,15 +67,6 @@ a biometric app lock, and a one-step Delete all data.
 **Planned:** a browser extension for ChatGPT, Claude and website time, GitLab and
 GitHub Enterprise, local AI summaries through Ollama, and data export.
 
-## The look
-
-One accent colour on deep charcoal. The icon, the Android splash screens and
-the themed icon all come from the same pulse mark.
-
-<p align="center">
-  <img src="assets/brand/icon-splash-preview.png" alt="WorkPulse app icon in four launcher shapes and small sizes, the Android 13 themed icon, the Play Store icon, and the splash screen on Android 12 and on older versions" width="800">
-</p>
-
 ## Status
 
 WorkPulse is in active development and is Android only. There is no store
